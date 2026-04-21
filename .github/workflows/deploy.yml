@@ -28,6 +28,8 @@ jobs:
           context: ./Akalya/client
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/akalya-client:latest
+          build-args: |
+            VITE_API_URL=/api
 
       - name: Build and push Server
         uses: docker/build-push-action@v5
