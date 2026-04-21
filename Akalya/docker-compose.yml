@@ -23,6 +23,7 @@ services:
       - MONGODB_URI=mongodb://db:27017/Akalya
       - JWT_SECRET=your-secret-key-change-in-production
       - LOVABLE_API_KEY=your-lovable-api-key
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173}
     depends_on:
       - db
     networks:

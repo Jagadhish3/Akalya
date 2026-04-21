@@ -38,6 +38,12 @@ const allowedOrigins = [
   'https://vedalya-remote-classroom-pzt2.onrender.com'
 ];
 
+// Add origins from environment variable if present
+if (process.env.ALLOWED_ORIGINS) {
+  const dynamicOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+  allowedOrigins.push(...dynamicOrigins);
+}
+
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
