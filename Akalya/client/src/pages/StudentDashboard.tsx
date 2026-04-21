@@ -22,6 +22,7 @@ import {
   submissionsAPI,
   classesAPI,
   queriesAPI,
+  attendanceAPI,
 } from "@/lib/api";
 import { CourseCard } from "@/components/CourseCard";
 import { SubmitAssignmentDialog } from "@/components/SubmitAssignmentDialog";
@@ -43,6 +44,7 @@ export default function StudentDashboard() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // Polling to emulate "real-time" REST updates (courses/assignments).
   // This keeps Student Explore + Assignments in sync after teacher create/delete.
@@ -185,6 +187,9 @@ export default function StudentDashboard() {
       if (activeSection === "doubt") {
         await fetchMyQueries();
       }
+      if (activeSection === "dashboard" || activeSection === "attendance") {
+        await fetchAttendanceStats();
+      }
     })();
 
     // Real-time-ish updates for courses/assignments while the student stays on page.
@@ -229,6 +234,17 @@ export default function StudentDashboard() {
       setCourses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAttendanceStats = async () => {
+    if (!user) return;
+    try {
+      const studentId = String(user.id ?? user._id ?? "");
+      const stats = await attendanceAPI.getStudentSummary(studentId);
+      setAttendanceStats(stats);
+    } catch (err) {
+      console.error("fetchAttendanceStats error", err);
     }
   };
 
@@ -833,8 +849,8 @@ const fetchMyQueries = async () => {
                   <Card className="hover-scale">
                     <CardHeader className="pb-3">
                       <CardDescription>Attendance</CardDescription>
-                      {/* Attendance remains fixed per your request */}
-                      <CardTitle className="text-4xl">0%</CardTitle>
+                      {/* Real attendance calculation */}
+                      <CardTitle className="text-4xl">{attendanceStats?.percentage ?? 0}%</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
@@ -1181,8 +1197,8 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                     <div className="flex items-center justify-between p-6 border rounded-lg bg-muted/50">
                       <div>
                         <p className="text-sm text-muted-foreground">{t("student.overallAttendance")}</p>
-                        <p className="text-4xl font-bold mt-2">0%</p>
-                        <p className="text-sm text-muted-foreground mt-1">138 of 150 {t("student.classes")}</p>
+                        <p className="text-4xl font-bold mt-2">{attendanceStats?.percentage ?? 0}%</p>
+                        <p className="text-sm text-muted-foreground mt-1">{attendanceStats?.present ?? 0} of {attendanceStats?.total ?? 0} {t("student.classes")}</p>
                       </div>
                       <Calendar className="h-16 w-16 text-primary opacity-20" />
                     </div>

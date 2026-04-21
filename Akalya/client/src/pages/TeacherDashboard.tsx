@@ -8,8 +8,9 @@ import {
   MessageSquare, TrendingUp, Upload, Bell, Settings,
   LogOut, Menu, X, Users
 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
-import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI } from "@/lib/api";
+import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI } from "@/lib/api";
 import { CreateCourseDialog } from "@/components/CreateCourseDialog";
 import { CourseCard } from "@/components/CourseCard";
 import { CreateAssignmentDialog } from "@/components/CreateAssignmentDialog";
@@ -24,6 +25,7 @@ import { QueriesList } from "@/components/QueriesList";
 
 export default function TeacherDashboard() {
   const { user, signOut } = useAuth();
+  const idOf = (obj: any) => (typeof obj === 'object' ? (obj._id || obj.id || obj.courseId) : obj);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -65,6 +67,12 @@ export default function TeacherDashboard() {
   // derived enrollment counts
   const [courseStudentCounts, setCourseStudentCounts] = useState<Record<string, number>>({});
   const [totalUniqueStudents, setTotalUniqueStudents] = useState<number>(0);
+
+  // attendance UI state
+  const [selectedAttendanceCourse, setSelectedAttendanceCourse] = useState<string>("");
+  const [attendanceStudents, setAttendanceStudents] = useState<any[]>([]);
+  const [attendanceBatch, setAttendanceBatch] = useState<Record<string, "present" | "absent">>({});
+  const [savingAttendance, setSavingAttendance] = useState(false);
 
   // reply UI state
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -215,6 +223,69 @@ export default function TeacherDashboard() {
       console.error("fetchEnrollments error", err);
       setEnrollments([]);
     }
+  };
+
+  const fetchAttendanceStudents = async (courseId: string) => {
+    if (!courseId) {
+      setAttendanceStudents([]);
+      return;
+    }
+    try {
+      setLoading(true);
+      // We need to find students enrolled in THIS course
+      const allEnrollments = await enrollmentsAPI.getAll();
+      const list = Array.isArray(allEnrollments) ? allEnrollments : [];
+      
+      // Filter by courseId
+      const filtered = list.filter((enr: any) => {
+        const cid = enr.courseId ?? enr.course_id ?? (enr.course && (enr.course._id ?? enr.course.id));
+        return String(cid) === String(courseId);
+      });
+
+      // Extract raw student info
+      const studentsFound = filtered.map((enr: any) => enr.student || enr.studentId || enr.user || null).filter(Boolean);
+      
+      // Initialize batch state: everyone present by default
+      const batch: Record<string, "present" | "absent"> = {};
+      studentsFound.forEach((s: any) => {
+        const sid = idOf(s);
+        if (sid) batch[sid] = "present";
+      });
+
+      setAttendanceStudents(studentsFound);
+      setAttendanceBatch(batch);
+    } catch (err) {
+      console.error("fetchAttendanceStudents error", err);
+      toast({ title: "Error", description: "Failed to load students for this course", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!selectedAttendanceCourse || attendanceStudents.length === 0) return;
+    setSavingAttendance(true);
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      const records = Object.entries(attendanceBatch).map(([studentId, status]) => ({
+        courseId: selectedAttendanceCourse,
+        studentId,
+        date,
+        status
+      }));
+
+      await attendanceAPI.saveBulk(records);
+      toast({ title: "Success", description: `Attendance saved for ${records.length} students` });
+    } catch (err: any) {
+      console.error("handleSaveAttendance error", err);
+      toast({ title: "Error", description: err.message || "Failed to save attendance", variant: "destructive" });
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
+  const toggleAttendance = (studentId: string, status: "present" | "absent") => {
+    setAttendanceBatch(prev => ({ ...prev, [studentId]: status }));
   };
 
   const handleDeleteCourse = async (courseId: string) => {
@@ -465,7 +536,7 @@ export default function TeacherDashboard() {
                 <Card className="hover-scale">
                   <CardHeader className="pb-3">
                     <CardDescription>{t('teacher.avgAttendance')}</CardDescription>
-                    <CardTitle className="text-4xl">88%</CardTitle>
+                    <CardTitle className="text-4xl">0%</CardTitle>
                   </CardHeader>
                   <CardContent><p className="text-sm text-muted-foreground">Across all courses</p></CardContent>
                 </Card>
@@ -770,20 +841,88 @@ export default function TeacherDashboard() {
                 <CardHeader>
                   <CardTitle>{t('teacher.todaysAttendance')}</CardTitle>
                   <CardDescription>{t('teacher.markAttendanceForClasses')}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
-                      <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
-                        <option>{t('student.selectCourse')}</option>
-                        <option>Mathematics</option>
-                        <option>Physics</option>
-                        <option>Chemistry</option>
-                      </select>
-                      <Button>{t('teacher.markAttendance')}</Button>
+                </CardHe                <CardContent>
+                  <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row gap-4 items-end">
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium">Select Course to Mark Attendance</label>
+                        <select 
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={selectedAttendanceCourse}
+                          onChange={(e) => {
+                            const cid = e.target.value;
+                            setSelectedAttendanceCourse(cid);
+                            fetchAttendanceStudents(cid);
+                          }}
+                        >
+                          <option value="">-- Choose a Course --</option>
+                          {courses.map(c => (
+                            <option key={idOf(c)} value={idOf(c)}>{c.title ?? c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button 
+                        disabled={!selectedAttendanceCourse || attendanceStudents.length === 0 || savingAttendance}
+                        onClick={handleSaveAttendance}
+                      >
+                        {savingAttendance ? "Saving..." : t('teacher.markAttendance')}
+                      </Button>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    {selectedAttendanceCourse && (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Student Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {attendanceStudents.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                                  No students enrolled in this course yet.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              attendanceStudents.map((s) => {
+                                const sid = idOf(s);
+                                const currentStatus = attendanceBatch[sid] || "present";
+                                return (
+                                  <TableRow key={sid}>
+                                    <TableCell className="font-medium">{s.fullName || s.name || "Student"}</TableCell>
+                                    <TableCell>{s.email || "—"}</TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-2">
+                                        <Button 
+                                          size="sm" 
+                                          variant={currentStatus === "present" ? "default" : "outline"}
+                                          onClick={() => toggleAttendance(sid, "present")}
+                                        >
+                                          Present
+                                        </Button>
+                                        <Button 
+                                          size="sm" 
+                                          variant={currentStatus === "absent" ? "destructive" : "outline"}
+                                          onClick={() => toggleAttendance(sid, "absent")}
+                                        >
+                                          Absent
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 md:grid-cols-3 opacity-50 pointer-events-none">
+                      <p className="col-span-3 text-xs text-muted-foreground uppercase tracking-wider font-bold">Historical Stats (Legacy View)</p>
                       {[
                         { course: "Mathematics", present: 42, absent: 3, total: 45, percentage: 93 },
                         { course: "Physics", present: 0, absent: 38, total: 38, percentage: 0 },
@@ -806,6 +945,7 @@ export default function TeacherDashboard() {
                     </div>
                   </div>
                 </CardContent>
+tent>
               </Card>
             </div>
           )}

@@ -651,3 +651,21 @@ export const lockerAPI = {
     URL.revokeObjectURL(a.href);
   },
 };
+
+/* -------------------------   Attendance API   ------------------------- */
+export const attendanceAPI = {
+  saveBulk: async (records: { courseId: string; studentId: string; date: string; status: 'present' | 'absent' }[]) => {
+    return apiFetch('/attendance', {
+      method: 'POST',
+      body: JSON.stringify({ records }),
+    });
+  },
+
+  getStudentSummary: async (studentId: string) => {
+    return apiFetch(`/attendance/student/${studentId}`);
+  },
+
+  getCourseHistory: async (courseId: string) => {
+    return apiFetch(`/attendance/course/${courseId}`);
+  },
+};
