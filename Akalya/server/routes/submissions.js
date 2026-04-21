@@ -2,6 +2,9 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import Submission from '../models/Submission.js';
+import { createNotification } from './notifications.js';
+import Assignment from '../models/Assignment.js';
+import CourseEnrollment from '../models/CourseEnrollment.js';
 
 const router = express.Router();
 
@@ -126,11 +129,50 @@ router.put('/:id/grade', authenticate, async (req, res) => {
     if (feedback !== undefined) sub.feedback = feedback;
     sub.gradedAt = new Date();
     await sub.save();
+
+    // Notify the student about their grade
+    const studentId = sub.studentId || sub.student_id || sub.student;
+    if (studentId) {
+      let assignmentTitle = 'your assignment';
+      let maxScore = null;
+      try {
+        const assignmentId = sub.assignmentId || sub.assignment_id || sub.assignment;
+        if (assignmentId) {
+          const a = await Assignment.findById(assignmentId).select('title maxScore courseId').lean();
+          if (a) {
+            assignmentTitle = a.title || assignmentTitle;
+            maxScore = a.maxScore || a.max_score || null;
+            // Update the enrollment progress if we can find the course
+            if (a.courseId) {
+              try {
+                const enrollment = await CourseEnrollment.findOne({ courseId: a.courseId, studentId });
+                if (enrollment && maxScore) {
+                  // Compute a simple progress bump: increment by (grade/maxScore * portion)
+                  const gainedPct = Math.round((sub.grade / maxScore) * 10); // each graded assignment worth ~10%
+                  enrollment.progress = Math.min(100, (enrollment.progress || 0) + gainedPct);
+                  await enrollment.save();
+                }
+              } catch (e) { /* non-critical */ }
+            }
+          }
+        }
+      } catch (e) { /* non-critical */ }
+
+      const scoreMsg = maxScore ? `${sub.grade}/${maxScore}` : `${sub.grade}`;
+      await createNotification({
+        userId: studentId,
+        title: 'Assignment Graded',
+        message: `Your submission for "${assignmentTitle}" has been graded: ${scoreMsg}.${feedback ? ' Feedback: ' + feedback : ''}`,
+        type: 'grade'
+      });
+    }
+
     return res.json(sub);
   } catch (err) {
     console.error('[PUT /api/submissions/:id/grade] error:', err);
     return res.status(500).json({ error: 'Failed to grade submission' });
   }
 });
+
 
 export default router;

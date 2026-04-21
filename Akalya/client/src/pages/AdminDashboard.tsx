@@ -9,7 +9,7 @@ import {
   LogOut, Menu, X, Shield, Activity, Trash2, Edit, RefreshCw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { usersAPI, coursesAPI, assignmentsAPI } from "@/lib/api";
+import { usersAPI, coursesAPI, assignmentsAPI, attendanceAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -54,6 +54,8 @@ export default function AdminDashboard() {
     teachers: 0,
     admins: 0
   });
+
+  const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
 
   // demo data for forum / resources / announcements if backend not present
   const [forumPosts, setForumPosts] = useState<any[]>([
@@ -141,12 +143,20 @@ export default function AdminDashboard() {
 
       setStats({
         totalUsers: usersList.length,
-        activeCourses: coursesList.filter(c => (c.status ?? "").toString().toLowerCase() === "published").length,
+        activeCourses: coursesList.filter(c => (c.status ?? '').toString().toLowerCase() === 'published').length,
         totalAssignments: assignmentsList.length,
         students: studentsCount,
         teachers: teachersCount,
         admins: adminsCount
       });
+
+      // Fetch attendance summary separately (admin-only endpoint)
+      try {
+        const attSummary = await attendanceAPI.getPlatformSummary();
+        setAttendanceSummary(attSummary);
+      } catch (e) {
+        // non-critical
+      }
     } catch (err) {
       console.error("fetchAllData error", err);
       toast({ title: "Error", description: "Failed to load admin data", variant: "destructive" });
@@ -589,25 +599,25 @@ export default function AdminDashboard() {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardDescription>Overall Attendance</CardDescription>
-                    <CardTitle className="text-4xl">89%</CardTitle>
+                    <CardTitle className="text-4xl">{attendanceSummary ? `${attendanceSummary.percentage}%` : '—'}</CardTitle>
                   </CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">Across all courses</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">Across all courses ({attendanceSummary?.present ?? 0} present / {attendanceSummary?.total ?? 0} sessions)</p></CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardDescription>Active Students</CardDescription>
-                    <CardTitle className="text-4xl">1,234</CardTitle>
+                    <CardDescription>Registered Students</CardDescription>
+                    <CardTitle className="text-4xl">{stats.students}</CardTitle>
                   </CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">This semester</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">Total student accounts</p></CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardDescription>Classes Today</CardDescription>
-                    <CardTitle className="text-4xl">48</CardTitle>
+                    <CardDescription>Teaching Faculty</CardDescription>
+                    <CardTitle className="text-4xl">{stats.teachers}</CardTitle>
                   </CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">Scheduled classes</p></CardContent>
+                  <CardContent><p className="text-sm text-muted-foreground">Active teacher accounts</p></CardContent>
                 </Card>
               </div>
 
@@ -618,17 +628,22 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {courses.slice(0, 6).map((course, idx) => (
-                      <div key={idOf(course) || idx} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{course.title}</span>
-                          <span className="text-sm text-muted-foreground">{Math.floor(80 + Math.random() * 15)}%</span>
+                    {courses.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No courses yet.</p>
+                    ) : courses.slice(0, 6).map((course, idx) => {
+                      const cid = idOf(course) || String(idx);
+                      return (
+                        <div key={cid} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{course.title}</span>
+                            <span className="text-sm text-muted-foreground">—</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div className="bg-primary h-2 rounded-full" style={{ width: '0%' }} />
+                          </div>
                         </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div className="bg-primary h-2 rounded-full" style={{ width: `${80 + Math.random() * 15}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>

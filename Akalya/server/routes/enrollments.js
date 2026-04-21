@@ -3,6 +3,8 @@ import express from 'express';
 import CourseEnrollment from '../models/CourseEnrollment.js';
 import Course from '../models/Course.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { createNotification } from './notifications.js';
+
 
 const router = express.Router();
 
@@ -50,7 +52,16 @@ router.post('/', authenticate, requireRole('student'), async (req, res) => {
     });
     await enrollment.populate('studentId', 'fullName email');
 
+    // Notify the student of successful enrollment
+    await createNotification({
+      userId: req.user._id,
+      title: 'Enrolled in Course',
+      message: `You have successfully enrolled in "${course.title}". Your teacher will be able to mark your attendance and assignments.`,
+      type: 'course'
+    });
+
     res.status(201).json(enrollment);
+
   } catch (error) {
     console.error('Enroll error:', error);
     if (error.code === 11000) return res.status(400).json({ error: 'Already enrolled in this course' });

@@ -15,6 +15,17 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // ── Single-admin constraint ──────────────────────────────────────────────
+    if (role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount > 0) {
+        return res.status(403).json({
+          error: 'An administrator account already exists. Only one admin is allowed in the system.'
+        });
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {

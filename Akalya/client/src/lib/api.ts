@@ -668,4 +668,19 @@ export const attendanceAPI = {
   getCourseHistory: async (courseId: string) => {
     return apiFetch(`/attendance/course/${courseId}`);
   },
+
+  getPlatformSummary: async () => {
+    return apiFetch('/attendance/summary');
+  },
+};
+
+/* -------------------------   Notifications API   ------------------------- */
+export const notificationsAPI = {
+  getMine: async () => apiFetch('/notifications/me'),
+
+  markRead: async (id: string) =>
+    apiFetch(`/notifications/${id}/read`, { method: 'PUT' }),
+
+  markAllRead: async () =>
+    apiFetch('/notifications/read-all', { method: 'PUT' }),
 };

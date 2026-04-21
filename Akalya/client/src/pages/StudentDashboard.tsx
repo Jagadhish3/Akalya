@@ -23,6 +23,7 @@ import {
   classesAPI,
   queriesAPI,
   attendanceAPI,
+  notificationsAPI,
 } from "@/lib/api";
 import { CourseCard } from "@/components/CourseCard";
 import { SubmitAssignmentDialog } from "@/components/SubmitAssignmentDialog";
@@ -45,6 +46,7 @@ export default function StudentDashboard() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Polling to emulate "real-time" REST updates (courses/assignments).
   // This keeps Student Explore + Assignments in sync after teacher create/delete.
@@ -190,6 +192,9 @@ export default function StudentDashboard() {
       if (activeSection === "dashboard" || activeSection === "attendance") {
         await fetchAttendanceStats();
       }
+      if (activeSection === "notifications") {
+        await fetchNotifications();
+      }
     })();
 
     // Real-time-ish updates for courses/assignments while the student stays on page.
@@ -245,6 +250,33 @@ export default function StudentDashboard() {
       setAttendanceStats(stats);
     } catch (err) {
       console.error("fetchAttendanceStats error", err);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await notificationsAPI.getMine();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("fetchNotifications error", err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsAPI.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error("markAllRead error", err);
+    }
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await notificationsAPI.markRead(id);
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error("markRead error", err);
     }
   };
 
@@ -1327,99 +1359,141 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
             </div>
           )}
 
-          {/* Remaining sections (progress, library, notifications, settings) are left unchanged except for the safe library filtering above */}
-          {activeSection === "progress" && (
-            <div className="space-y-6 animate-fade-in">
-              <div>
-                <h2 className="text-2xl font-bold">{t("student.progressTracking")}</h2>
-                <p className="text-muted-foreground">{t("student.monitorProgress")}</p>
-              </div>
+          {/* Remaining sections (progress, library, notifications, settings) */}
+          {activeSection === "progress" && (() => {
+            // Compute real progress values from enrollment data
+            const enrolledList = getEnrolledCourseOptions();
+            const enrolledCount = enrolledList.length;
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("student.overallProgress")}</CardTitle>
-                    <CardDescription>{t("student.progress")}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-32 h-32 rounded-full border-8 border-primary/20">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold">75%</p>
-                            <p className="text-xs text-muted-foreground">{t("student.completed")}</p>
+            // Map of enrolledCourses to get progress per course
+            const progressByCourse = (Array.isArray(enrolledCourses) ? enrolledCourses : []).map((enr: any) => {
+              const raw = enr.course ?? enr.courseId ?? enr.course_id ?? enr;
+              const title = typeof raw === 'object' ? (raw.title ?? raw.name ?? 'Course') : 'Course';
+              const prog = typeof enr.progress === 'number' ? enr.progress : 0;
+              return { name: title, progress: prog };
+            });
+
+            const avgProgress = progressByCourse.length > 0
+              ? Math.round(progressByCourse.reduce((s, c) => s + c.progress, 0) / progressByCourse.length)
+              : 0;
+
+            const submittedAssignments = Array.isArray(submissions) ? submissions.length : 0;
+            const totalAssignments = Array.isArray(assignments) ? assignments.filter((a: any) => {
+              const cid = String(a.courseId ?? a.raw?.courseId ?? a.raw?.course ?? '');
+              return !cid || enrolledCourseIdSet.has(cid);
+            }).length : 0;
+
+            // Average score from graded submissions
+            const gradedSubs = (Array.isArray(submissions) ? submissions : []).filter((s: any) => s.grade !== null && s.grade !== undefined);
+            const avgScore = gradedSubs.length > 0
+              ? Math.round(gradedSubs.reduce((sum: number, s: any) => sum + Number(s.grade), 0) / gradedSubs.length)
+              : null;
+
+            // Dynamic badges
+            const badges = [
+              { name: "First Enrollment", icon: "🎓", earned: enrolledCount >= 1 },
+              { name: "Assignment Submitted", icon: "📝", earned: submittedAssignments >= 1 },
+              { name: "5 Courses", icon: "📚", earned: enrolledCount >= 5 },
+              { name: "Top Scorer", icon: "⭐", earned: avgScore !== null && avgScore >= 90 },
+              { name: "10 Courses", icon: "🏆", earned: enrolledCount >= 10 },
+            ];
+
+            return (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h2 className="text-2xl font-bold">{t("student.progressTracking")}</h2>
+                  <p className="text-muted-foreground">{t("student.monitorProgress")}</p>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{t("student.overallProgress")}</CardTitle>
+                      <CardDescription>{t("student.progress")}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div className="text-center">
+                          <div className="inline-flex items-center justify-center w-32 h-32 rounded-full border-8 border-primary/20">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold">{avgProgress}%</p>
+                              <p className="text-xs text-muted-foreground">{t("student.completed")}</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span>Courses Completed</span>
-                            <span className="font-medium">8 / 12</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Assignments Submitted</span>
-                            <span className="font-medium">45 / 50</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Average Score</span>
-                            <span className="font-medium">85%</span>
+                          <div className="space-y-3 mt-4">
+                            <div className="flex justify-between text-sm">
+                              <span>Enrolled Courses</span>
+                              <span className="font-medium">{enrolledCount}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Assignments Submitted</span>
+                              <span className="font-medium">{submittedAssignments} / {totalAssignments}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Average Score</span>
+                              <span className="font-medium">{avgScore !== null ? `${avgScore}%` : "No grades yet"}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{t("student.courseProgress")}</CardTitle>
+                      <CardDescription>{t("student.completed")}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {progressByCourse.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p className="text-sm">Enroll in courses to see your progress here.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {progressByCourse.map((course, index) => (
+                            <div key={`${course.name}-${index}`} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium truncate max-w-[70%]">{course.name}</span>
+                                <span className="text-sm text-muted-foreground">{course.progress}%</span>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full transition-all duration-500"
+                                  style={{ width: `${course.progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>{t("student.courseProgress")}</CardTitle>
-                    <CardDescription>{t("student.completed")}</CardDescription>
+                    <CardTitle>Achievement Badges</CardTitle>
+                    <CardDescription>Milestones you've reached</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {[ 
-                        { name: "Mathematics", progress: 85 },
-                        { name: "Physics", progress: 70 },
-                        { name: "Chemistry", progress: 0 },
-                        { name: "Computer Science", progress: 65 },
-                      ].map((course, index) => (
-                        <div key={`${course.name ?? 'prog'}-${index}`} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">{course.name}</span>
-                            <span className="text-sm text-muted-foreground">{course.progress}%</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${course.progress}%` }} />
-                          </div>
+                    <div className="grid gap-4 md:grid-cols-5">
+                      {badges.map((badge, index) => (
+                        <div
+                          key={`${badge.name}-${index}`}
+                          className={`p-4 border rounded-lg text-center transition-all ${badge.earned ? "bg-primary/5 border-primary/20" : "opacity-40 grayscale"}`}
+                        >
+                          <div className="text-4xl mb-2">{badge.icon}</div>
+                          <p className="text-sm font-medium">{badge.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{badge.earned ? "✓ Earned" : "Locked"}</p>
                         </div>
                       ))}
                     </div>
                   </CardContent>
                 </Card>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Achievement Badges</CardTitle>
-                  <CardDescription>Milestones you've reached</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-4">
-                    {[ 
-                      { name: "First Course", icon: "🎓", earned: true },
-                      { name: "Perfect Score", icon: "⭐", earned: true },
-                      { name: "5 Courses", icon: "📚", earned: true },
-                      { name: "10 Courses", icon: "🏆", earned: false },
-                    ].map((badge, index) => (
-                      <div key={`${badge.name ?? 'badge'}-${index}`} className={`p-4 border rounded-lg text-center ${badge.earned ? "bg-primary/5 border-primary/20" : "opacity-50"}`}>
-                        <div className="text-4xl mb-2">{badge.icon}</div>
-                        <p className="text-sm font-medium">{badge.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+            );
+          })()}
 
           {activeSection === "library" && (
             <div className="space-y-6 animate-fade-in">
@@ -1511,42 +1585,55 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>All Notifications</span>
-                    <Button variant="outline" size="sm">Mark all as read</Button>
+                    <span>All Notifications {notifications.filter(n => !n.isRead).length > 0 && <span className="ml-2 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">{notifications.filter(n => !n.isRead).length}</span>}</span>
+                    <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={notifications.every(n => n.isRead)}>Mark all as read</Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {[
-                      { type: "assignment", title: "New Assignment Posted", message: "Mathematics: Complete Chapter 5 exercises", time: "2 hours ago", unread: true },
-                      { type: "grade", title: "Assignment Graded", message: "Your Physics assignment has been graded: 92/100", time: "5 hours ago", unread: true },
-                      { type: "course", title: "Course Update", message: "New materials added to Chemistry course", time: "1 day ago", unread: false },
-                      { type: "announcement", title: "Important Announcement", message: "Campus will be closed on Friday for maintenance", time: "2 days ago", unread: false },
-                      { type: "reminder", title: "Assignment Due Soon", message: "Physics assignment due in 2 days", time: "3 days ago", unread: false },
-                    ].map((notification, index) => (
-                      <div key={`${notification.type ?? 'notif'}-${index}`} className={`p-4 border rounded-lg flex gap-3 ${notification.unread ? "bg-primary/5 border-primary/20" : ""
-                        }`}>
-
-                        <div className={`p-2 rounded-lg h-fit ${notification.type === "assignment" ? "bg-blue-500/10" :
-                          notification.type === "grade" ? "bg-green-500/10" :
-                            notification.type === "course" ? "bg-purple-500/10" :
-                              notification.type === "announcement" ? "bg-orange-500/10" :
-                                "bg-yellow-500/10"
-                          }`}>
-                          <Bell className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-1">
-                            <h4 className="font-semibold text-sm">{notification.title}</h4>
-                            {notification.unread && (
-                              <span className="w-2 h-2 bg-primary rounded-full" />
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
-                          <p className="text-xs text-muted-foreground">{notification.time}</p>
-                        </div>
+                    {notifications.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Bell className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p className="font-medium">No notifications yet</p>
+                        <p className="text-sm">Enroll in a course or submit an assignment to get started.</p>
                       </div>
-                    ))}
+                    ) : (
+                      notifications.map((notification) => {
+                        const notifId = notification._id || notification.id;
+                        const isUnread = !notification.isRead;
+                        const typeColor: Record<string, string> = {
+                          assignment: "bg-blue-500/10",
+                          grade: "bg-green-500/10",
+                          course: "bg-purple-500/10",
+                          announcement: "bg-orange-500/10",
+                          attendance: "bg-cyan-500/10",
+                          reminder: "bg-yellow-500/10",
+                        };
+                        const bgClass = typeColor[notification.type] || "bg-muted";
+                        const createdAt = notification.createdAt ? new Date(notification.createdAt) : null;
+                        const timeAgo = createdAt ? format(createdAt, "PPp") : "";
+
+                        return (
+                          <div
+                            key={notifId}
+                            className={`p-4 border rounded-lg flex gap-3 cursor-pointer transition-colors ${isUnread ? "bg-primary/5 border-primary/20" : "hover:bg-muted/40"}`}
+                            onClick={() => isUnread && notifId && handleMarkRead(notifId)}
+                          >
+                            <div className={`p-2 rounded-lg h-fit ${bgClass}`}>
+                              <Bell className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between mb-1">
+                                <h4 className="font-semibold text-sm">{notification.title}</h4>
+                                {isUnread && <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1" />}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-1">{notification.message}</p>
+                              <p className="text-xs text-muted-foreground">{timeAgo}</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </CardContent>
               </Card>

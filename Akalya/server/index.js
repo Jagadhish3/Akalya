@@ -22,6 +22,7 @@ import preparationResourcesRouter from './routes/preparationResources.js';
 import practiceRouter from './routes/practice.js';
 import mockTestsRouter from './routes/mockTests.js';
 import lockerRouter from './routes/locker.js';
+import notificationsRouter from './routes/notifications.js';
 
 dotenv.config();
 
@@ -145,6 +146,7 @@ app.use('/api/preparation-resources', preparationResourcesRouter);
 app.use('/api/practice', practiceRouter);
 app.use('/api/mock-tests', mockTestsRouter);
 app.use('/api/locker', lockerRouter);
+app.use('/api/notifications', notificationsRouter);
 
 /* ---------------------------------------------------
    HEALTH CHECK
