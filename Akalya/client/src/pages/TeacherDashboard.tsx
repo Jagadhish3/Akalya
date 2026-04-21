@@ -841,7 +841,8 @@ export default function TeacherDashboard() {
                 <CardHeader>
                   <CardTitle>{t('teacher.todaysAttendance')}</CardTitle>
                   <CardDescription>{t('teacher.markAttendanceForClasses')}</CardDescription>
-                </CardHe                <CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-6">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                       <div className="flex-1 space-y-2">
@@ -945,7 +946,6 @@ export default function TeacherDashboard() {
                     </div>
                   </div>
                 </CardContent>
-tent>
               </Card>
             </div>
           )}
