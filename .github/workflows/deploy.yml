@@ -49,5 +49,6 @@ jobs:
           script: |
             cd ~/Akalya/Akalya
             git pull origin deploy
+            docker-compose down
             docker-compose pull
             docker-compose up -d
