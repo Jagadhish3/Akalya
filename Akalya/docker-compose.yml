@@ -1,0 +1,45 @@
+services:
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME}/akalya-client
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - akalya-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME}/akalya-server
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - MONGODB_URI=mongodb://db:27017/Akalya
+      - JWT_SECRET=your-secret-key-change-in-production
+      - LOVABLE_API_KEY=your-lovable-api-key
+    depends_on:
+      - db
+    networks:
+      - akalya-network
+
+  db:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - akalya-network
+
+networks:
+  akalya-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
