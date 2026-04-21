@@ -786,8 +786,8 @@ export default function TeacherDashboard() {
                     <div className="grid gap-4 md:grid-cols-3">
                       {[
                         { course: "Mathematics", present: 42, absent: 3, total: 45, percentage: 93 },
-                        { course: "Physics", present: 35, absent: 3, total: 38, percentage: 92 },
-                        { course: "Chemistry", present: 48, absent: 4, total: 52, percentage: 92 },
+                        { course: "Physics", present: 0, absent: 38, total: 38, percentage: 0 },
+                        { course: "Chemistry", present: 0, absent: 52, total: 52, percentage: 0 },
                       ].map((record) => (
                         <Card key={`${record.course}-${record.total}`}>
                           <CardContent className="p-4">

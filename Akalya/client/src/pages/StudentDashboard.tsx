@@ -834,7 +834,7 @@ const fetchMyQueries = async () => {
                     <CardHeader className="pb-3">
                       <CardDescription>Attendance</CardDescription>
                       {/* Attendance remains fixed per your request */}
-                      <CardTitle className="text-4xl">92%</CardTitle>
+                      <CardTitle className="text-4xl">0%</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
@@ -1181,7 +1181,7 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                     <div className="flex items-center justify-between p-6 border rounded-lg bg-muted/50">
                       <div>
                         <p className="text-sm text-muted-foreground">{t("student.overallAttendance")}</p>
-                        <p className="text-4xl font-bold mt-2">92%</p>
+                        <p className="text-4xl font-bold mt-2">0%</p>
                         <p className="text-sm text-muted-foreground mt-1">138 of 150 {t("student.classes")}</p>
                       </div>
                       <Calendar className="h-16 w-16 text-primary opacity-20" />
@@ -1363,7 +1363,7 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                       {[ 
                         { name: "Mathematics", progress: 85 },
                         { name: "Physics", progress: 70 },
-                        { name: "Chemistry", progress: 92 },
+                        { name: "Chemistry", progress: 0 },
                         { name: "Computer Science", progress: 65 },
                       ].map((course, index) => (
                         <div key={`${course.name ?? 'prog'}-${index}`} className="space-y-2">
