@@ -342,7 +342,7 @@ export default function TeacherDashboard() {
       return;
     }
     try {
-      await queriesAPI.update(queryId, { reply: replyText, status: "responded", respondedBy: user?.id ?? user?._id ?? null });
+      await queriesAPI.update(queryId, { reply: replyText, status: "responded", respondedBy: user?.id ?? null });
       toast({ title: "Replied", description: "Reply saved and student will see it." });
       setReplyingTo(null);
       setReplyText("");
