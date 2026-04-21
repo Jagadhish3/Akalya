@@ -1,0 +1,48 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches: [ "deploy" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Client
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Akalya/client
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/akalya-client:latest
+
+      - name: Build and push Server
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Akalya/server
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/akalya-server:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/Akalya/Akalya
+            git pull origin deploy
+            docker-compose pull
+            docker-compose up -d
