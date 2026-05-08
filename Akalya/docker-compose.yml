@@ -18,8 +18,13 @@ services:
     image: ${DOCKERHUB_USERNAME}/akalya-server
     ports:
       - "3001:3001"
-    env_file:
-      - ./server/.env
+    environment:
+      - PORT=3001
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     depends_on:
       - db
     networks:
