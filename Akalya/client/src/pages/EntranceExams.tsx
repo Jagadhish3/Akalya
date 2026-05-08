@@ -12,109 +12,150 @@ import { FileQuestion, MapPin, ArrowRight, ExternalLink } from "lucide-react";
 const STATES = ["Telangana", "Andhra Pradesh", "Karnataka", "Maharashtra", "Tamil Nadu", "All"];
 
 export function EntranceExamsList({ detailBasePath = "/entrance-exams" }: { detailBasePath?: string }) {
-  const [national, setNational] = useState<any[]>([]);
-  const [state, setState] = useState<any[]>([]);
-  const [stateFilter, setStateFilter] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [levelFilter, setLevelFilter] = useState<string>("after12th");
+  const [stateFilter, setStateFilter] = useState<string>("all");
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([
-      entranceExamsAPI.getAll({ level: "national" }),
-      entranceExamsAPI.getAll({ level: "state" }),
-    ]).then(([n, s]) => {
-      if (mounted) {
-        setNational(Array.isArray(n) ? n : []);
-        setState(Array.isArray(s) ? s : []);
+  const entranceExamsData: Record<string, Record<string, { name: string; state: string; overview: string; officialWebsite: string; }[]>> = {
+    after10th: {
+      national: [
+        { name: "NTSE (National Talent Search Examination)", state: "National", overview: "National level scholarship program for 10th class students.", officialWebsite: "https://ncert.nic.in" },
+        { name: "Indian Army Boys Sports Company", state: "National", overview: "Entry for young boys into sports and army.", officialWebsite: "https://joinindianarmy.nic.in" }
+      ],
+      ap: [
+        { name: "AP POLYCET", state: "Andhra Pradesh", overview: "Admission into Diploma level programs in Govt, Aided, Private, Un-aided Polytechnics.", officialWebsite: "https://polycetap.nic.in" },
+        { name: "APRJC CET", state: "Andhra Pradesh", overview: "Admission into AP Residential Junior Colleges.", officialWebsite: "https://aprs.apcfss.in" }
+      ],
+      ts: [
+        { name: "TS POLYCET", state: "Telangana", overview: "Admission into Diploma Courses in Polytechnics in Telangana.", officialWebsite: "https://polycet.sbtet.telangana.gov.in" },
+        { name: "TSRJC CET", state: "Telangana", overview: "Admission to Telangana Residential Junior Colleges.", officialWebsite: "https://tsrjdc.cgg.gov.in" }
+      ],
+      ka: [
+        { name: "Karnataka Polytechnic Admission", state: "Karnataka", overview: "Merit-based admission to diploma courses in Karnataka.", officialWebsite: "https://dtetech.karnataka.gov.in" }
+      ],
+      mh: [
+        { name: "MSBTE Diploma Admission", state: "Maharashtra", overview: "Admission to first year diploma in engineering/technology.", officialWebsite: "https://msbte.org.in" }
+      ],
+      tn: [
+        { name: "TN Polytechnic Admission", state: "Tamil Nadu", overview: "Admission to diploma courses in Tamil Nadu.", officialWebsite: "https://tndte.gov.in" }
+      ]
+    },
+    after12th: {
+      national: [
+        { name: "JEE Main", state: "National", overview: "Joint Entrance Examination for Engineering (NITs, IIITs).", officialWebsite: "https://jeemain.nta.nic.in" },
+        { name: "NEET UG", state: "National", overview: "National Eligibility cum Entrance Test for Medical/Dental.", officialWebsite: "https://neet.nta.nic.in" },
+        { name: "CUET UG", state: "National", overview: "Common University Entrance Test for Undergrad programs in Central Universities.", officialWebsite: "https://cuet.samarth.ac.in" },
+        { name: "NDA", state: "National", overview: "National Defence Academy Examination for Army, Navy and Air Force.", officialWebsite: "https://upsc.gov.in" },
+        { name: "CLAT", state: "National", overview: "Common Law Admission Test for National Law Universities.", officialWebsite: "https://consortiumofnlus.ac.in" }
+      ],
+      ap: [
+        { name: "AP EAPCET (EAMCET)", state: "Andhra Pradesh", overview: "Engineering, Agriculture and Pharmacy Common Entrance Test.", officialWebsite: "https://cets.apsche.ap.gov.in" }
+      ],
+      ts: [
+        { name: "TS EAPCET (EAMCET)", state: "Telangana", overview: "Engineering, Agricultural and Medical Common Entrance Test.", officialWebsite: "https://eapcet.tsche.ac.in" }
+      ],
+      ka: [
+        { name: "KCET", state: "Karnataka", overview: "Karnataka Common Entrance Test for Engineering, Pharmacy, Agriculture.", officialWebsite: "https://cetonline.karnataka.gov.in/kea" },
+        { name: "COMEDK UGET", state: "Karnataka", overview: "Under Graduate Entrance Test for Engineering Colleges in Karnataka.", officialWebsite: "https://www.comedk.org" }
+      ],
+      mh: [
+        { name: "MHT CET", state: "Maharashtra", overview: "Maharashtra Common Entrance Test for Engineering and Pharmacy.", officialWebsite: "https://cetcell.mahacet.org" }
+      ],
+      tn: [
+        { name: "TNEA", state: "Tamil Nadu", overview: "Tamil Nadu Engineering Admissions (Merit-based counselling).", officialWebsite: "https://www.tneaonline.org" },
+        { name: "TNAU Admission", state: "Tamil Nadu", overview: "Tamil Nadu Agricultural University Admission.", officialWebsite: "https://tnau.ac.in" }
+      ]
+    }
+  };
+
+  const getFilteredExams = () => {
+    let list: any[] = [];
+    const levelData = entranceExamsData[levelFilter];
+    if (levelData) {
+      if (stateFilter === "all") {
+        Object.values(levelData).forEach(arr => {
+          list = [...list, ...arr];
+        });
+      } else {
+        list = levelData[stateFilter] || [];
       }
-    }).finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, []);
+    }
+    return list;
+  };
 
-  const filteredState = stateFilter && stateFilter !== "All"
-    ? state.filter((e) => (e.state || "").toLowerCase().includes(stateFilter.toLowerCase()))
-    : state;
+  const list = getFilteredExams();
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">National & State Entrance Exams</h1>
+        <h1 className="text-3xl font-bold mb-2">Entrance Exams</h1>
         <p className="text-muted-foreground">
-          Overview, eligibility, exam pattern, syllabus and important dates for major exams.
-          Use filters for state-level exams.
+          Find National and State-level Entrance Exams for After 10th and After 12th.
         </p>
       </div>
-      <Tabs defaultValue="national" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="national">National</TabsTrigger>
-          <TabsTrigger value="state">State Level</TabsTrigger>
-        </TabsList>
-        <TabsContent value="national" className="space-y-4">
-          <p className="text-sm text-muted-foreground">JEE, NEET, CUET, CLAT, NDA, NIFT, NID, SSC, Banking, Railway and more.</p>
-          {loading ? (
-            <p>Loading...</p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {national.map((e) => (
-                <Card key={e._id || e.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <FileQuestion className="h-8 w-8 text-primary mb-2" />
-                    <CardTitle className="text-lg">{e.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">{e.overview}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link to={`${detailBasePath}/${e.slug || e._id}`}>
-                      <Button variant="outline" size="sm" className="w-full gap-1">
-                        View details <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        <TabsContent value="state" className="space-y-4">
-          <div className="flex gap-4 items-center flex-wrap">
-            <span className="text-sm font-medium">Filter by state:</span>
-            <Select value={stateFilter || "All"} onValueChange={setStateFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {loading ? (
-            <p>Loading...</p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredState.map((e) => (
-                <Card key={e._id || e.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-primary" />
-                      {e.state && <Badge variant="secondary">{e.state}</Badge>}
-                    </div>
-                    <CardTitle className="text-lg">{e.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">{e.overview}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link to={`${detailBasePath}/${e.slug || e._id}`}>
-                      <Button variant="outline" size="sm" className="w-full gap-1">
-                        View details <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Education Level</label>
+          <Select value={levelFilter} onValueChange={setLevelFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select Level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="after10th">After 10th</SelectItem>
+              <SelectItem value="after12th">After 12th</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">State / Region</label>
+          <Select value={stateFilter} onValueChange={setStateFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select State" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All States & National</SelectItem>
+              <SelectItem value="national">National Level</SelectItem>
+              <SelectItem value="ap">Andhra Pradesh</SelectItem>
+              <SelectItem value="ts">Telangana</SelectItem>
+              <SelectItem value="tn">Tamil Nadu</SelectItem>
+              <SelectItem value="ka">Karnataka</SelectItem>
+              <SelectItem value="mh">Maharashtra</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {list.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No exams match your filters. Try changing filters.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((e, idx) => (
+            <Card key={`${e.name}-${idx}`} className="hover:shadow-md transition-shadow flex flex-col">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <FileQuestion className="h-6 w-6 text-primary" />
+                  <Badge variant="secondary">{e.state}</Badge>
+                </div>
+                <CardTitle className="text-lg leading-tight">{e.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col space-y-4">
+                <CardDescription className="flex-1 line-clamp-3">{e.overview}</CardDescription>
+                <div className="mt-auto">
+                  <a href={e.officialWebsite.startsWith("http") ? e.officialWebsite : `https://${e.officialWebsite}`} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="w-full gap-2">
+                      Official Website / Apply <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

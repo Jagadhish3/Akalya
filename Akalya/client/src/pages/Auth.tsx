@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { GraduationCap, User, BookOpen, Shield } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const emailSchema = z.string().email("Invalid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -18,6 +19,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, signUp, signIn, signInWithGoogle, loading, getUserRole, refreshCurrentUser} = useAuth();
+  const { toast } = useToast();
   const [role, setRole] = useState<string>("student");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
@@ -72,6 +74,18 @@ const Auth = () => {
 
     try {
       emailSchema.parse(email);
+
+      // Show popup if password is shorter than 6 characters
+      if (password.length < 6) {
+        toast({
+          title: "Password Too Short",
+          description: "Password length should be more than 6 characters.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       passwordSchema.parse(password);
 
       const result = await signIn(email, password);
@@ -88,6 +102,11 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error("Validation error:", error.message);
+      toast({
+        title: "Validation Error",
+        description: error.message || "Please check your credentials.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -105,10 +124,28 @@ const Auth = () => {
 
     try {
       emailSchema.parse(email);
+
+      // Show popup if password is shorter than 6 characters
+      if (password.length < 6) {
+        toast({
+          title: "Password Too Short",
+          description: "Password length should be more than 6 characters.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       passwordSchema.parse(password);
       
       if (password !== confirmPassword) {
-        throw new Error("Passwords do not match");
+        toast({
+          title: "Passwords Don't Match",
+          description: "The passwords you entered do not match. Please try again.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       const result = await signUp(email, password, fullName, role as 'student' | 'teacher' | 'admin');
@@ -122,6 +159,11 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error("Validation error:", error.message);
+      toast({
+        title: "Validation Error",
+        description: error.message || "Please check your details.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

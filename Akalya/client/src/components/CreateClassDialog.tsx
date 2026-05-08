@@ -8,10 +8,11 @@ import { classesAPI, enrollmentsAPI } from "@/lib/api";
 
 interface Props {
   courseId?: string;
+  courses?: any[];
   onClassCreated?: () => void;
 }
 
-export function CreateClassDialog({ courseId, onClassCreated }: Props) {
+export function CreateClassDialog({ courseId, courses = [], onClassCreated }: Props) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -29,16 +30,24 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
 
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [unit, setUnit] = useState<number>(1);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(courseId || "");
   const [loading, setLoading] = useState(false);
 
-  // fetch enrolled students for the course when the dialog opens
+  // keep selectedCourseId in sync with courses prop if it's empty
   useEffect(() => {
-    if (!open || !courseId) return;
+    if (!selectedCourseId && courses.length > 0) {
+      setSelectedCourseId(String(courses[0].id ?? courses[0]._id ?? ""));
+    }
+  }, [courses, selectedCourseId]);
+
+  // fetch enrolled students for the selected course
+  useEffect(() => {
+    if (!open || !selectedCourseId) return;
     let mounted = true;
     (async () => {
       try {
-        // enrollmentsAPI.getAll({ courseId }) expected to return enrollments
-        const enrs: any[] = Array.isArray(await enrollmentsAPI.getAll({ courseId })) ? await enrollmentsAPI.getAll({ courseId }) : [];
+        const enrs: any[] = Array.isArray(await enrollmentsAPI.getAll({ courseId: selectedCourseId })) ? await enrollmentsAPI.getAll({ courseId: selectedCourseId }) : [];
         if (!mounted) return;
         let students = enrs.map((enr) => {
           const raw = enr.student ?? enr.studentId ?? enr.user ?? enr.userId ?? null;
@@ -54,12 +63,8 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
           return { id: String(raw), label: String(raw).slice(0, 8) };
         }).filter(Boolean);
         
-        // ✅ Deduplicate by ID
         students = Array.from(new Map(students.map(s => [s.id, s])).values());
-        
-        // Save
         setCourseStudents(students);
-        
       } catch (err) {
         console.error("failed loading course students", err);
         setCourseStudents([]);
@@ -67,7 +72,7 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
     })();
 
     return () => { mounted = false; };
-  }, [open, courseId]);
+  }, [open, selectedCourseId]);
 
   const reset = () => {
     setTitle("");
@@ -75,6 +80,7 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
     setClassType('recorded');
     setScheduledAt("");
     setVideoUrl("");
+    setUnit(1);
     setVisibilityMode('public');
     setSelectedStudentIds([]);
     setManualIds("");
@@ -103,12 +109,13 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
       ])).filter(Boolean);
 
       const payload: any = {
-        courseId: courseId || undefined,
+        courseId: selectedCourseId || undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         classType,
         scheduledAt: scheduledAt || undefined,
         videoUrl: videoUrl?.trim() || undefined,
+        unit,
         isPublic: visibilityMode === 'public',
         hasVideo: Boolean(videoUrl && videoUrl.trim()),
         // only include enrolledStudents when specific mode and at least one id provided
@@ -145,6 +152,23 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {courses.length > 0 && (
+            <div>
+              <label className="text-sm font-medium">Select Course</label>
+              <select 
+                className="w-full rounded-md border px-3 py-2 mt-1" 
+                value={selectedCourseId} 
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+              >
+                {courses.map(c => (
+                  <option key={String(c.id ?? c._id)} value={String(c.id ?? c._id)}>
+                    {c.title ?? c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium">Title</label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Week 1: Introduction" />
@@ -161,6 +185,15 @@ export function CreateClassDialog({ courseId, onClassCreated }: Props) {
               <select value={classType} onChange={(e) => setClassType(e.target.value as any)} className="w-full rounded-md border px-3 py-2">
                 <option value="recorded">Recorded</option>
                 <option value="live">Live</option>
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="text-sm font-medium">Unit (1-6)</label>
+              <select value={unit} onChange={(e) => setUnit(Number(e.target.value))} className="w-full rounded-md border px-3 py-2">
+                {[1, 2, 3, 4, 5, 6].map(u => (
+                  <option key={u} value={u}>Unit {u}</option>
+                ))}
               </select>
             </div>
 

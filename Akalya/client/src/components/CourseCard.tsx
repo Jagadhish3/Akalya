@@ -24,6 +24,7 @@ interface Props {
   onStartLearning?: (courseId: string) => void;
   onManage?: () => void;
   onDelete?: (courseId: string) => void;
+  onViewCourse?: (courseId: string) => void;
   canDelete?: boolean;
   className?: string;
 }
@@ -35,6 +36,7 @@ export const CourseCard: React.FC<Props> = ({
   onStartLearning,
   onManage,
   onDelete,
+  onViewCourse,
   canDelete = false,
   className = "",
 }) => {
@@ -121,8 +123,13 @@ export const CourseCard: React.FC<Props> = ({
         <div className="flex items-center justify-between gap-3">
           <a
             href={course.url ?? "#"}
-            onClick={(e) => { if (!course.url) e.preventDefault(); }}
-            className="text-sm text-primary underline"
+            onClick={(e) => { 
+              if (!course.url) {
+                e.preventDefault();
+                if (onViewCourse) onViewCourse(id);
+              }
+            }}
+            className="text-sm text-primary underline cursor-pointer"
           >
             View course
           </a>

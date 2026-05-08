@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useNavigate } from "react-router-dom";
 import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI } from "@/lib/api";
 import { CreateCourseDialog } from "@/components/CreateCourseDialog";
+import { EditCourseDialog } from "@/components/EditCourseDialog";
 import { CourseCard } from "@/components/CourseCard";
 import { CreateAssignmentDialog } from "@/components/CreateAssignmentDialog";
 import { GradeSubmissionDialog } from "@/components/GradeSubmissionDialog";
@@ -64,12 +65,16 @@ export default function TeacherDashboard() {
   const [queries, setQueries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Manage course UI state
+  const [editingCourse, setEditingCourse] = useState<any>(null);
+
   // derived enrollment counts
   const [courseStudentCounts, setCourseStudentCounts] = useState<Record<string, number>>({});
   const [totalUniqueStudents, setTotalUniqueStudents] = useState<number>(0);
 
-  // attendance UI state
   const [selectedAttendanceCourse, setSelectedAttendanceCourse] = useState<string>("");
+  const [selectedAttendanceDate, setSelectedAttendanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [attendanceTopic, setAttendanceTopic] = useState<string>("");
   const [attendanceStudents, setAttendanceStudents] = useState<any[]>([]);
   const [attendanceBatch, setAttendanceBatch] = useState<Record<string, "present" | "absent">>({});
   const [savingAttendance, setSavingAttendance] = useState(false);
@@ -225,31 +230,52 @@ export default function TeacherDashboard() {
     }
   };
 
-  const fetchAttendanceStudents = async (courseId: string) => {
+  const fetchAttendanceStudents = async (courseId: string, dateStr: string) => {
     if (!courseId) {
       setAttendanceStudents([]);
       return;
     }
     try {
       setLoading(true);
-      // We need to find students enrolled in THIS course
+      
+      // Fetch enrollments to get student info (student details are populated by backend)
       const allEnrollments = await enrollmentsAPI.getAll();
       const list = Array.isArray(allEnrollments) ? allEnrollments : [];
       
       // Filter by courseId
       const filtered = list.filter((enr: any) => {
-        const cid = enr.courseId ?? enr.course_id ?? (enr.course && (enr.course._id ?? enr.course.id));
+        let cid = enr.courseId ?? enr.course_id ?? enr.course;
+        if (cid && typeof cid === 'object') {
+          cid = cid._id ?? cid.id;
+        }
         return String(cid) === String(courseId);
       });
 
-      // Extract raw student info
-      const studentsFound = filtered.map((enr: any) => enr.student || enr.studentId || enr.user || null).filter(Boolean);
+      // Extract student info
+      const studentsFound = filtered.map((enr: any) => {
+        return enr.student || enr.studentId || enr.user || null;
+      }).filter(Boolean);
+
+      // Fetch existing attendance to allow rectification
+      const historyRaw = await attendanceAPI.getCourseHistory(courseId);
+      const history = Array.isArray(historyRaw) ? historyRaw : [];
+      const historyForDate = history.filter((a: any) => (a.date || a.createdAt?.split('T')[0]) === dateStr);
+
+      const existingBatch: Record<string, "present" | "absent"> = {};
+      let existingTopic = "";
+      historyForDate.forEach((a: any) => {
+         const sid = typeof a.studentId === 'object' ? (a.studentId?._id ?? a.studentId?.id) : a.studentId;
+         if (sid) existingBatch[String(sid)] = a.status;
+         if (a.topic) existingTopic = a.topic;
+      });
+
+      setAttendanceTopic(existingTopic);
       
-      // Initialize batch state: everyone present by default
+      // Initialize batch state: use existing status if available, otherwise "present"
       const batch: Record<string, "present" | "absent"> = {};
       studentsFound.forEach((s: any) => {
         const sid = idOf(s);
-        if (sid) batch[sid] = "present";
+        if (sid) batch[sid] = existingBatch[sid] || "present";
       });
 
       setAttendanceStudents(studentsFound);
@@ -266,12 +292,13 @@ export default function TeacherDashboard() {
     if (!selectedAttendanceCourse || attendanceStudents.length === 0) return;
     setSavingAttendance(true);
     try {
-      const date = new Date().toISOString().split('T')[0];
+      const date = selectedAttendanceDate;
       const records = Object.entries(attendanceBatch).map(([studentId, status]) => ({
         courseId: selectedAttendanceCourse,
         studentId,
         date,
-        status
+        status,
+        topic: attendanceTopic
       }));
 
       await attendanceAPI.saveBulk(records);
@@ -290,7 +317,6 @@ export default function TeacherDashboard() {
 
   const handleDeleteCourse = async (courseId: string) => {
     if (!courseId) return;
-    if (user?.role !== "teacher") return; // teacher-only delete
     if (!confirm("Delete this course? This will remove it from student Explore Courses.")) return;
 
     try {
@@ -566,9 +592,10 @@ export default function TeacherDashboard() {
                                 <p className="text-sm text-muted-foreground">{count} students</p>
                               </div>
                             </div>
-                            <Button size="sm" onClick={() => {
-                              toast({ title: "Manage course", description: "Options: Edit course, View students, Delete course (coming soon)." });
-                            }}>Manage</Button>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => setEditingCourse(course)}>Manage</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDeleteCourse(courseId)}>Delete</Button>
+                            </div>
                           </div>
                         );
                       })}
@@ -657,6 +684,15 @@ export default function TeacherDashboard() {
                 <CreateCourseDialog onCourseCreated={fetchCourses} />
               </div>
 
+              {editingCourse && (
+                <EditCourseDialog
+                  course={editingCourse}
+                  open={!!editingCourse}
+                  onOpenChange={(isOpen) => !isOpen && setEditingCourse(null)}
+                  onCourseUpdated={fetchCourses}
+                />
+              )}
+
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -684,11 +720,10 @@ export default function TeacherDashboard() {
                           status: course.status,
                           url: course.url ?? course.courseUrl ?? null,
                         }}
-                        canDelete={user?.role === "teacher"}
+                        canDelete={true}
                         onDelete={(id) => handleDeleteCourse(id)}
-                        onManage={() => {
-                          toast({ title: "Manage course", description: "Edit / View students / Settings are coming soon." });
-                        }}
+                        onManage={() => setEditingCourse(course)}
+                        onViewCourse={() => toast({ title: "Course view", description: "Navigating to course content..." })}
                       />
                     );
                   })}
@@ -846,14 +881,14 @@ export default function TeacherDashboard() {
                   <div className="space-y-6">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                       <div className="flex-1 space-y-2">
-                        <label className="text-sm font-medium">Select Course to Mark Attendance</label>
+                        <label className="text-sm font-medium">Select Course</label>
                         <select 
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
                           value={selectedAttendanceCourse}
                           onChange={(e) => {
                             const cid = e.target.value;
                             setSelectedAttendanceCourse(cid);
-                            fetchAttendanceStudents(cid);
+                            fetchAttendanceStudents(cid, selectedAttendanceDate);
                           }}
                         >
                           <option value="">-- Choose a Course --</option>
@@ -862,16 +897,39 @@ export default function TeacherDashboard() {
                           ))}
                         </select>
                       </div>
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium">Date</label>
+                        <input
+                          type="date"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={selectedAttendanceDate}
+                          onChange={(e) => {
+                            const d = e.target.value;
+                            setSelectedAttendanceDate(d);
+                            if (selectedAttendanceCourse) fetchAttendanceStudents(selectedAttendanceCourse, d);
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium">Topic Covered</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Intro to Algebra"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={attendanceTopic}
+                          onChange={(e) => setAttendanceTopic(e.target.value)}
+                        />
+                      </div>
                       <Button 
                         disabled={!selectedAttendanceCourse || attendanceStudents.length === 0 || savingAttendance}
                         onClick={handleSaveAttendance}
                       >
-                        {savingAttendance ? "Saving..." : t('teacher.markAttendance')}
+                        {savingAttendance ? "Saving..." : "Submit Attendance"}
                       </Button>
                     </div>
 
                     {selectedAttendanceCourse && (
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="border rounded-lg overflow-hidden mt-6">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -921,29 +979,6 @@ export default function TeacherDashboard() {
                         </Table>
                       </div>
                     )}
-
-                    <div className="grid gap-4 md:grid-cols-3 opacity-50 pointer-events-none">
-                      <p className="col-span-3 text-xs text-muted-foreground uppercase tracking-wider font-bold">Historical Stats (Legacy View)</p>
-                      {[
-                        { course: "Mathematics", present: 42, absent: 3, total: 45, percentage: 93 },
-                        { course: "Physics", present: 0, absent: 38, total: 38, percentage: 0 },
-                        { course: "Chemistry", present: 0, absent: 52, total: 52, percentage: 0 },
-                      ].map((record) => (
-                        <Card key={`${record.course}-${record.total}`}>
-                          <CardContent className="p-4">
-                            <h4 className="font-semibold mb-3">{record.course}</h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between"><span>Present:</span><span className="font-medium text-green-600">{record.present}</span></div>
-                              <div className="flex justify-between"><span>Absent:</span><span className="font-medium text-red-600">{record.absent}</span></div>
-                              <div className="flex justify-between"><span>Total:</span><span className="font-medium">{record.total}</span></div>
-                              <div className="pt-2 border-t">
-                                <div className="flex justify-between"><span>Avg. Attendance:</span><span className="font-bold">{record.percentage}%</span></div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -959,7 +994,7 @@ export default function TeacherDashboard() {
                   <p className="text-muted-foreground">{t('teacher.uploadManageResources')}</p>
                 </div>
                 <div className="flex gap-2">
-                  {courses.length > 0 && <CreateClassDialog courseId={String(courses[0].id ?? courses[0]._id ?? courses[0].courseId ?? "")} onClassCreated={fetchClasses} />}
+                  {courses.length > 0 && <CreateClassDialog courses={courses} courseId={String(courses[0].id ?? courses[0]._id ?? courses[0].courseId ?? "")} onClassCreated={fetchClasses} />}
                   <Button><Upload className="h-4 w-4 mr-2" />Upload Resource</Button>
                 </div>
               </div>
@@ -973,7 +1008,7 @@ export default function TeacherDashboard() {
                   {loading ? <p className="text-center text-muted-foreground">Loading videos...</p> : classes.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground mb-4">No video lectures uploaded yet.</p>
-                      {courses.length > 0 && <CreateClassDialog courseId={String(courses[0]?.id ?? courses[0]?._id ?? "")} onClassCreated={fetchClasses} />
+                      {courses.length > 0 && <CreateClassDialog courses={courses} courseId={String(courses[0]?.id ?? courses[0]?._id ?? "")} onClassCreated={fetchClasses} />
                     }
                     </div>
                   ) : (

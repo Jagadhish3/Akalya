@@ -39,7 +39,7 @@ function buildFilterFromReqQuery(q) {
 router.get('/', async (req, res) => {
   try {
     const filter = buildFilterFromReqQuery(req.query);
-    const classes = await ClassModel.find(filter).sort({ createdAt: -1 }).lean();
+    const classes = await ClassModel.find(filter).populate('course', 'title description').sort({ createdAt: -1 }).lean();
     res.json(classes);
   } catch (err) {
     console.error('GET /api/classes error', err);
@@ -72,6 +72,7 @@ router.post('/', async (req, res) => {
       transcript,
       isDownloadable,
       isPublic,
+      unit,
     } = req.body;
 
     if (!title || !classType) {
@@ -88,6 +89,7 @@ router.post('/', async (req, res) => {
         transcript: transcript || '',
         isDownloadable: !!isDownloadable,
         isPublic: !!isPublic,
+        unit: unit ? Number(unit) : null,
         // auto-set hasVideo if videoUrl is present OR if caller passed hasVideo
         hasVideo: !!( (typeof req.body.hasVideo !== 'undefined' && req.body.hasVideo) || (videoUrl && videoUrl.trim()) ),
         createdAt: new Date(),

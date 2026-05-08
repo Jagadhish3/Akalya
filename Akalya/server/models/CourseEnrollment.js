@@ -17,6 +17,11 @@ const courseEnrollmentSchema = new mongoose.Schema({
     max: 100,
     default: 0
   },
+  completedUnits: [{
+    type: Number,
+    min: 1,
+    max: 6
+  }],
   enrolledAt: {
     type: Date,
     default: Date.now

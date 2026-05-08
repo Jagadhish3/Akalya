@@ -6,8 +6,10 @@ import { useNavigate } from "react-router-dom";
 interface User {
   id: string;
   _id?: string;
+  userId?: string;
   email: string;
   fullName: string;
+  name?: string;
   role: 'student' | 'teacher' | 'admin';
   avatarUrl?: string;
 }

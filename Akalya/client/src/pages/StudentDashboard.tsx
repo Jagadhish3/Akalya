@@ -32,14 +32,35 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { StudentWebsiteChatbot } from "@/components/StudentWebsiteChatbot";
+import { useLocation, useNavigate } from "react-router-dom";
+import { CourseLecturesDialog } from "@/components/CourseLecturesDialog";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const queryParams = new URLSearchParams(location.search);
+  const sectionParam = queryParams.get("section") || "dashboard";
+
+  const [activeSection, setActiveSection] = useState(sectionParam);
+
+  useEffect(() => {
+    if (sectionParam !== activeSection) {
+      setActiveSection(sectionParam);
+    }
+  }, [sectionParam]);
+
+  const handleSectionChange = (sectionId: string) => {
+    setActiveSection(sectionId);
+    navigate(`?section=${sectionId}`);
+  };
   const [courses, setCourses] = useState<any[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -48,6 +69,11 @@ export default function StudentDashboard() {
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [scholarshipType, setScholarshipType] = useState<"merit" | "need" | "caste">("merit");
+  const [scholarshipLevel, setScholarshipLevel] = useState<"class10" | "class12" | "graduation">("class10");
   // Polling to emulate "real-time" REST updates (courses/assignments).
   // This keeps Student Explore + Assignments in sync after teacher create/delete.
   const pollRef = useRef<number | null>(null);
@@ -59,7 +85,7 @@ export default function StudentDashboard() {
     currentUserId: string | null
   ) => {
     if (!assignment || !Array.isArray(submissionsList)) return null;
-  
+
     // normalize assignment IDs
     const assignmentIds = [
       assignment.id,
@@ -75,46 +101,46 @@ export default function StudentDashboard() {
     ]
       .filter(Boolean)
       .map((x) => String(x));
-  
+
     // check each submission
     const candidates = submissionsList.filter((s: any) => {
       const subAssign = String(
         s.assignment_id ??
-          s.assignmentId ??
-          s.assignment?._id ??
-          s.assignment?.id ??
-          s.assignment ??
-          ""
+        s.assignmentId ??
+        s.assignment?._id ??
+        s.assignment?.id ??
+        s.assignment ??
+        ""
       );
-  
+
       const subStudent = String(
         s.student_id ??
-          s.studentId ??
-          s.student?._id ??
-          s.student?.id ??
-          s.student ??
-          ""
+        s.studentId ??
+        s.student?._id ??
+        s.student?.id ??
+        s.student ??
+        ""
       );
-  
+
       const matchA = assignmentIds.includes(subAssign);
       const matchS = String(currentUserId) === subStudent;
-  
+
       return matchA && matchS;
     });
-  
+
     if (candidates.length === 0) return null;
-  
+
     // pick most recent
     candidates.sort(
       (a: any, b: any) =>
         new Date(b.updatedAt ?? b.submitted_at ?? b.createdAt).getTime() -
         new Date(a.updatedAt ?? a.submitted_at ?? a.createdAt).getTime()
     );
-  
+
     return candidates[0];
   };
-  
-  
+
+
 
 
   // upcoming classes state (for dashboard)
@@ -146,18 +172,18 @@ export default function StudentDashboard() {
   });
 
   const normalizeSubmission = (s: any) => {
-    const assignmentId = 
+    const assignmentId =
       s.assignment_id ??
       s.assignmentId ??
       (typeof s.assignment === "string" ? s.assignment : null) ??
       (typeof s.assignment === "object" ? s.assignment._id ?? s.assignment.id : null);
-  
+
     const studentId =
       s.student_id ??
       s.studentId ??
       (typeof s.student === "string" ? s.student : null) ??
       (typeof s.student === "object" ? s.student._id ?? s.student.id : null);
-  
+
     return {
       id: String(s._id ?? s.id ?? Math.random().toString(36).slice(2)),
       assignmentId: String(assignmentId ?? ""),
@@ -170,7 +196,7 @@ export default function StudentDashboard() {
       submittedAt: s.submitted_at ?? s.submittedAt ?? s.createdAt ?? null,
     };
   };
-  
+
   // Fetch sequence: ensure enrollments are loaded before classes so filtering is correct
   useEffect(() => {
     (async () => {
@@ -319,41 +345,41 @@ export default function StudentDashboard() {
   };
 
   // inside StudentDashboard: fetchAssignments() -> use the student-scoped endpoint
-const fetchAssignments = async () => {
-  if (!user) return;
+  const fetchAssignments = async () => {
+    if (!user) return;
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const [rawAssignments, rawSubmissions] = await Promise.all([
-      assignmentsAPI.getAll(),
-      // If the user is a student, fetch their own submissions with /me
-      user?.role === "student" || user?.role === "learner"
-        ? submissionsAPI.getMine()
-        : submissionsAPI.getAll(),
-    ]);
+      const [rawAssignments, rawSubmissions] = await Promise.all([
+        assignmentsAPI.getAll(),
+        // If the user is a student, fetch their own submissions with /me
+        user?.role === "student"
+          ? submissionsAPI.getMine()
+          : submissionsAPI.getAll(),
+      ]);
 
-    // defensive: ensure arrays
-    const assignmentsData = Array.isArray(rawAssignments) ? rawAssignments : [];
-    const submissionsData = Array.isArray(rawSubmissions) ? rawSubmissions : [];
+      // defensive: ensure arrays
+      const assignmentsData = Array.isArray(rawAssignments) ? rawAssignments : [];
+      const submissionsData = Array.isArray(rawSubmissions) ? rawSubmissions : [];
 
-    const normalizedAssignments = (assignmentsData || []).map(normalizeAssignment);
-    const normalizedSubmissions = (submissionsData || []).map(normalizeSubmission);
+      const normalizedAssignments = (assignmentsData || []).map(normalizeAssignment);
+      const normalizedSubmissions = (submissionsData || []).map(normalizeSubmission);
 
-    setAssignments(normalizedAssignments);
-    setSubmissions(normalizedSubmissions);
-// in StudentDashboard.tsx - inside fetchAssignments catch
-} catch (error: any) {
-  console.error('fetchAssignments error', error);
-  const serverMsg = error?.message || (error?.toString && error.toString()) || 'Failed to fetch assignments';
-  toast({
-    title: 'Error',
-    description: serverMsg,
-    variant: 'destructive',
-  });
-}
+      setAssignments(normalizedAssignments);
+      setSubmissions(normalizedSubmissions);
+      // in StudentDashboard.tsx - inside fetchAssignments catch
+    } catch (error: any) {
+      console.error('fetchAssignments error', error);
+      const serverMsg = error?.message || (error?.toString && error.toString()) || 'Failed to fetch assignments';
+      toast({
+        title: 'Error',
+        description: serverMsg,
+        variant: 'destructive',
+      });
+    }
 
-};
+  };
 
 
   // optimistic insertion when a new submission is created by the student
@@ -420,7 +446,7 @@ const fetchAssignments = async () => {
       );
 
       // Visible classes for this student (belongs to student's enrolled courses OR explicitly includes this student OR is public for the course)
-      const currentUserId = String(user?.id ?? user?._id ?? user?.userId ?? "");
+      const currentUserId = String(user?.id ?? user?._id ?? "");
 
       const visibleForStudent = normalized.filter((c: any) => {
         const courseId = String(c._normalizedCourseId ?? "");
@@ -471,43 +497,43 @@ const fetchAssignments = async () => {
 
   // --- Queries API helpers (NEW) -------------------
   // replace your existing fetchMyQueries with this
-const fetchMyQueries = async () => {
-  if (!user) return;
-  try {
-    setQueryLoading(true);
+  const fetchMyQueries = async () => {
+    if (!user) return;
+    try {
+      setQueryLoading(true);
 
-    // single request -> backend may return either an array or { items, total, ... }
-    const resp = await queriesAPI.getAll({ page: '1', limit: '50' }); // optional paging
-    const all = Array.isArray(resp) ? resp : (resp?.items ?? []);
+      // single request -> backend may return either an array or { items, total, ... }
+      const resp = await queriesAPI.getAll({ page: '1', limit: '50' }); // optional paging
+      const all = Array.isArray(resp) ? resp : (resp?.items ?? []);
 
-    const myId = String(user?.id ?? user?._id ?? user?.userId ?? '');
+      const myId = String(user?.id ?? user?._id ?? user?.userId ?? '');
 
-    const mine = (all || [])
-      .filter((q: any) => {
-        const qStudent =
-          q.student ??
-          q.studentId ??
-          q.student_id ??
-          (q.student && (q.student._id ?? q.student.id)) ??
-          null;
-        if (!qStudent) return false;
-        if (typeof qStudent === 'object') return String(qStudent._id ?? qStudent.id) === myId;
-        return String(qStudent) === myId;
-      })
-      .sort((a: any, b: any) => {
-        const ta = new Date(a.createdAt ?? a.created_at ?? a.created ?? 0).getTime();
-        const tb = new Date(b.createdAt ?? b.created_at ?? b.created ?? 0).getTime();
-        return tb - ta;
-      });
+      const mine = (all || [])
+        .filter((q: any) => {
+          const qStudent =
+            q.student ??
+            q.studentId ??
+            q.student_id ??
+            (q.student && (q.student._id ?? q.student.id)) ??
+            null;
+          if (!qStudent) return false;
+          if (typeof qStudent === 'object') return String(qStudent._id ?? qStudent.id) === myId;
+          return String(qStudent) === myId;
+        })
+        .sort((a: any, b: any) => {
+          const ta = new Date(a.createdAt ?? a.created_at ?? a.created ?? 0).getTime();
+          const tb = new Date(b.createdAt ?? b.created_at ?? b.created ?? 0).getTime();
+          return tb - ta;
+        });
 
-    setMyQueries(mine);
-  } catch (err: any) {
-    console.error('fetchMyQueries error', err);
-    setMyQueries([]);
-  } finally {
-    setQueryLoading(false);
-  }
-};
+      setMyQueries(mine);
+    } catch (err: any) {
+      console.error('fetchMyQueries error', err);
+      setMyQueries([]);
+    } finally {
+      setQueryLoading(false);
+    }
+  };
 
 
   const submitQuery = async () => {
@@ -519,7 +545,7 @@ const fetchMyQueries = async () => {
       toast({ title: "Empty question", description: "Please write your question before submitting", variant: "destructive" });
       return;
     }
-  
+
     try {
       const payload: any = {
         // optional: backend should derive student from token; keep fields compatible
@@ -531,10 +557,10 @@ const fetchMyQueries = async () => {
         status: "open",
         createdAt: new Date().toISOString(),
       };
-  
+
       // create on server and capture returned saved document
       const saved = await queriesAPI.create(payload);
-  
+
       // optimistic update: prepend returned item (if server returned it)
       if (saved) {
         setMyQueries(prev => {
@@ -547,7 +573,7 @@ const fetchMyQueries = async () => {
         // fallback: refetch if server didn't return saved doc
         await fetchMyQueries();
       }
-  
+
       toast({ title: "Submitted", description: "Your question was submitted to the teacher." });
       setQueryText("");
       setSelectedCourseForQuery("");
@@ -556,7 +582,7 @@ const fetchMyQueries = async () => {
       toast({ title: "Error", description: "Failed to submit question", variant: "destructive" });
     }
   };
-  
+
   // -------------------------------------------------
 
   const isEnrolled = (courseId: string) => {
@@ -569,45 +595,11 @@ const fetchMyQueries = async () => {
     });
   };
 
-  // open first available video for a course in a new tab
+  const [lecturesCourseId, setLecturesCourseId] = useState<string | null>(null);
+
+  // open the course lectures dialog
   const handleStartLearning = async (courseId: string) => {
-    try {
-      const classesForCourse = await classesAPI.getAll({ courseId, hasVideo: true });
-
-      const list = Array.isArray(classesForCourse) ? classesForCourse : [];
-
-      if (list.length === 0) {
-        toast({
-          title: "No videos available",
-          description: "There are no uploaded videos for this course yet.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const cls = list.find((c: any) => (c.videoUrl || c.video || c.src || c.url));
-      const first = cls || list[0];
-
-      const videoUrl = first?.videoUrl || first?.video || first?.src || first?.url || first?.file;
-
-      if (!videoUrl) {
-        toast({
-          title: "No playable video found",
-          description: "The video record exists but no URL was found.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      window.open(videoUrl, "_blank", "noopener,noreferrer");
-    } catch (err: any) {
-      console.error("Start learning error", err);
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to open video",
-        variant: "destructive",
-      });
-    }
+    setLecturesCourseId(courseId);
   };
 
   const menuItems = [
@@ -619,11 +611,8 @@ const fetchMyQueries = async () => {
     { id: "doubt", label: "Doubt Clearance", icon: MessageSquare },
     { id: "progress", label: "Progress", icon: TrendingUp },
     { id: "library", label: t("nav.library"), icon: Library },
-    { id: "notifications", label: t("nav.notifications"), icon: Bell },
-    { id: "settings", label: t("nav.settings"), icon: Settings },
   ];
 
-  // helper to find enrolled course options (normalize enrolledCourses shapes)
   const getEnrolledCourseOptions = () => {
     if (!Array.isArray(enrolledCourses) || enrolledCourses.length === 0) return [];
     return enrolledCourses.map((enr: any) => {
@@ -637,7 +626,7 @@ const fetchMyQueries = async () => {
         return { id: String(raw._id ?? raw.id ?? raw.courseId ?? raw.course_id ?? ""), title: raw.title ?? raw.name };
       }
       return null;
-    }).filter(Boolean);
+    }).filter((opt: any) => opt && opt.id && opt.title);
   };
 
   // compute set of enrolled course IDs for easy filtering of classes
@@ -660,36 +649,36 @@ const fetchMyQueries = async () => {
 
   const studentVisibleClasses = Array.isArray(classes)
     ? classes.filter((c: any) => {
-        const cCourse = String(c._normalizedCourseId ?? c.courseId ?? c.course ?? c.course_id ?? "");
-        const status = (c._normalizedStatus ?? (c.status ?? "")).toString().toLowerCase();
-        const hasVideo = Boolean(c._hasVideo || c.hasVideo || c.videoUrl || c.video || c.src || c.url || c.file);
+      const cCourse = String(c._normalizedCourseId ?? c.courseId ?? c.course ?? c.course_id ?? "");
+      const status = (c._normalizedStatus ?? (c.status ?? "")).toString().toLowerCase();
+      const hasVideo = Boolean(c._hasVideo || c.hasVideo || c.videoUrl || c.video || c.src || c.url || c.file);
 
-        const enrolledList: string[] = Array.isArray(c._enrolledStudentsNormalized)
-          ? c._enrolledStudentsNormalized
-          : (Array.isArray(c.enrolledStudents) ? c.enrolledStudents.map((s: any) => (typeof s === "object" ? String(s._id ?? s.id ?? "") : String(s))) : []);
+      const enrolledList: string[] = Array.isArray(c._enrolledStudentsNormalized)
+        ? c._enrolledStudentsNormalized
+        : (Array.isArray(c.enrolledStudents) ? c.enrolledStudents.map((s: any) => (typeof s === "object" ? String(s._id ?? s.id ?? "") : String(s))) : []);
 
-        const isPublic = c.isPublic === true || c.public === true || c.visibility === "public";
+      const isPublic = c.isPublic === true || c.public === true || c.visibility === "public";
 
-        // 1) if student explicitly allowed in enrolled list
-        if (enrolledList && enrolledList.length > 0) {
-          if (currentUserId && enrolledList.includes(currentUserId)) {
-            // require video presence for library listing (we only show recorded sessions here)
-            return hasVideo;
-          }
-        }
-
-        // 2) if public and course matches enrolled, allow (and require video)
-        if (isPublic && cCourse && enrolledCourseIdSet.has(cCourse)) {
+      // 1) if student explicitly allowed in enrolled list
+      if (enrolledList && enrolledList.length > 0) {
+        if (currentUserId && enrolledList.includes(currentUserId)) {
+          // require video presence for library listing (we only show recorded sessions here)
           return hasVideo;
         }
+      }
 
-        // 3) fallback: course match for student's enrolled courses and recorded/completed with video
-        if (cCourse && enrolledCourseIdSet.has(cCourse) && (status === "completed" || status === "done") && hasVideo) {
-          return true;
-        }
+      // 2) if public and course matches enrolled, allow (and require video)
+      if (isPublic && cCourse && enrolledCourseIdSet.has(cCourse)) {
+        return hasVideo;
+      }
 
-        return false;
-      })
+      // 3) fallback: course match for student's enrolled courses and recorded/completed with video
+      if (cCourse && enrolledCourseIdSet.has(cCourse) && (status === "completed" || status === "done") && hasVideo) {
+        return true;
+      }
+
+      return false;
+    })
     : [];
 
   // refetch assignments when tab becomes visible (helpful to pick up teacher grading)
@@ -704,6 +693,78 @@ const fetchMyQueries = async () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
+  const scholarshipData: Record<string, Record<string, { name: string; provider: string; amount: string; eligibility: string; deadline: string; link: string; tag: string; }[]>> = {
+    merit: {
+      class10: [
+        { name: "National Means-cum-Merit Scholarship (NMMS)", provider: "Ministry of Education, Govt. of India", amount: "₹12,000/year", eligibility: "Class 8 pass, family income ≤ ₹3.5 lakh/year, govt school student", deadline: "November (state-wise)", link: "https://scholarships.gov.in", tag: "Central Govt" },
+        { name: "INSPIRE Scholarship (SHE) – Class 10 Top", provider: "Dept. of Science & Technology", amount: "₹80,000/year", eligibility: "Top 1% in Class 10 board, pursuing science at Class 11", deadline: "October 31", link: "https://online-inspire.gov.in", tag: "Science" },
+        { name: "Pragati Scholarship (AICTE)", provider: "AICTE", amount: "₹50,000/year", eligibility: "Girl students, rural area, family income ≤ ₹8 lakh", deadline: "December", link: "https://scholarships.gov.in", tag: "Girls" },
+        { name: "Dr. APJ Abdul Kalam Ignite Award", provider: "National Innovation Foundation", amount: "₹10,000 + certificate", eligibility: "Innovative idea by students up to Class 12", deadline: "August 31", link: "https://nif.org.in", tag: "Innovation" },
+        { name: "Vidyasiri Scholarship (Karnataka)", provider: "Karnataka Govt.", amount: "₹10,000–₹30,000/year", eligibility: "State board toppers, rural domicile required", deadline: "September", link: "https://karepass.cgg.gov.in", tag: "State Govt" },
+      ],
+      class12: [
+        { name: "Central Sector Scheme of Scholarships (CSSS)", provider: "Ministry of Education", amount: "₹10,000–₹20,000/year", eligibility: "Top 20 percentile in Class 12, family income ≤ ₹8 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "Central Govt" },
+        { name: "INSPIRE Scholarship (SHE) – Class 12", provider: "DST, Govt. of India", amount: "₹80,000/year", eligibility: "Top 1% in Class 12, enrolled BSc/Integrated MSc Natural Sciences", deadline: "October 31", link: "https://online-inspire.gov.in", tag: "Science" },
+        { name: "KVPY Fellowship", provider: "IISc Bangalore / DST", amount: "₹5,000–₹7,000/month + contingency", eligibility: "Class 12 / 1st yr BSc, aptitude test + interview", deadline: "September", link: "https://kvpy.iisc.ac.in", tag: "Research" },
+        { name: "Post-Matric Scholarship (State Merit)", provider: "State Social Welfare Depts.", amount: "₹5,000–₹15,000/year", eligibility: "Rural students ≥ 60% in Class 11, income ≤ ₹1 lakh", deadline: "October", link: "https://scholarships.gov.in", tag: "State Govt" },
+        { name: "GE Foundation Scholar-Leaders Programme", provider: "GE Foundation India", amount: "₹1 lakh/year", eligibility: "Girls in STEM, rural background, income ≤ ₹3 lakh", deadline: "June", link: "https://www.b4s.in", tag: "STEM Girls" },
+      ],
+      graduation: [
+        { name: "Prime Minister's Scholarship Scheme (PMSS)", provider: "Ministry of Home Affairs", amount: "₹30,000–₹36,000/year", eligibility: "Wards of ex-servicemen/paramilitary, min 60% in Class 12", deadline: "October 15", link: "https://ksb.gov.in", tag: "Central Govt" },
+        { name: "INSPIRE Scholarship – BSc/Integrated MSc", provider: "DST", amount: "₹80,000/year + ₹20,000 research", eligibility: "Top 1% in Class 12, natural sciences", deadline: "October 31", link: "https://online-inspire.gov.in", tag: "Research" },
+        { name: "Indira Gandhi Scholarship for Single Girl Child", provider: "UGC", amount: "₹36,200/year", eligibility: "Single girl child, PG programmes in any university", deadline: "October", link: "https://www.ugc.gov.in", tag: "Girls" },
+        { name: "Ishan Uday (North-East Region)", provider: "UGC", amount: "₹5,400–₹7,800/month", eligibility: "North-East domicile in general degree colleges", deadline: "October", link: "https://scholarships.gov.in", tag: "Regional" },
+        { name: "Reliance Foundation Scholarship", provider: "Reliance Foundation", amount: "₹4 lakh (4 years)", eligibility: "Rural, family income ≤ ₹2.5 lakh, STEM/Liberal Arts", deadline: "June", link: "https://rf.foundation/scholarships", tag: "Corporate" },
+      ],
+    },
+    need: {
+      class10: [
+        { name: "Mukhyamantri Medhavi Vidyarthi Yojana (MP)", provider: "Govt. of Madhya Pradesh", amount: "Full tuition fee waiver", eligibility: "Family income ≤ ₹6 lakh, MP board ≥ 70% / CBSE ≥ 85%", deadline: "August", link: "http://scholarshipportal.mp.nic.in", tag: "State Govt" },
+        { name: "Swami Vivekananda Merit-cum-Means (WB)", provider: "Govt. of West Bengal", amount: "₹12,000–₹60,000/year", eligibility: "Class 10 pass, rural WB domicile, income ≤ ₹2.5 lakh", deadline: "November", link: "https://svmcm.wbhed.gov.in", tag: "State Govt" },
+        { name: "NSP Pre-Matric Scholarship – Minorities", provider: "Ministry of Minority Affairs", amount: "₹1,000–₹10,000/year", eligibility: "Muslim/Sikh/Christian/Buddhist student, income ≤ ₹1 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "Minority" },
+        { name: "Aam Aadmi Scholarship (Delhi)", provider: "Govt. of Delhi", amount: "₹5,000–₹25,000/year", eligibility: "Delhi domicile, income ≤ ₹2.5 lakh, Class 9–12", deadline: "September", link: "https://edistrict.delhigovt.nic.in", tag: "State Govt" },
+        { name: "e-Grantz Scholarship (Kerala)", provider: "Govt. of Kerala", amount: "₹5,000–₹15,000/year", eligibility: "Kerala domicile, rural area, income ≤ ₹1 lakh", deadline: "November", link: "https://egrantz.kerala.gov.in", tag: "State Govt" },
+      ],
+      class12: [
+        { name: "Post-Matric Scholarship – General/EWS", provider: "State Govts. / MoSJE", amount: "₹3,000–₹10,000/year", eligibility: "EWS/OBC, Class 11–12, income ≤ ₹1 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "EWS/OBC" },
+        { name: "NSP Post-Matric – Minority", provider: "Ministry of Minority Affairs", amount: "₹13,500–₹20,000/year", eligibility: "Minority community, income ≤ ₹2 lakh, ≥ 50% marks", deadline: "October 31", link: "https://scholarships.gov.in", tag: "Minority" },
+        { name: "Apaar Scholarship (Tata Trusts)", provider: "Tata Trusts", amount: "₹30,000/year", eligibility: "Rural girl, income ≤ ₹3 lakh, Science/Commerce stream", deadline: "September", link: "https://www.tatatrusts.org", tag: "NGO" },
+        { name: "Vidyalakshmi Education Loan + Interest Subsidy", provider: "Dept. of Financial Services", amount: "Interest subsidy on education loan", eligibility: "Merit-based, recognised institution, income ≤ ₹4.5 lakh", deadline: "Rolling", link: "https://www.vidyalakshmi.co.in", tag: "Loan+Scholarship" },
+        { name: "Sitaram Jindal Foundation Scholarship", provider: "Sitaram Jindal Foundation", amount: "₹1,000–₹3,000/month", eligibility: "All streams, income ≤ ₹3 lakh, rural domicile preferred", deadline: "September 30", link: "https://sitaramjindalfoundation.org", tag: "Foundation" },
+      ],
+      graduation: [
+        { name: "Pragati Scholarship – AICTE (Graduation)", provider: "AICTE", amount: "₹50,000/year + ₹30,000 incidental", eligibility: "Girl, AICTE-approved tech institution, income ≤ ₹8 lakh", deadline: "November", link: "https://scholarships.gov.in", tag: "Girls/Technical" },
+        { name: "NSP Post-Matric Minority – Degree Level", provider: "Ministry of Minority Affairs", amount: "₹20,000–₹25,000/year", eligibility: "Minority, degree/diploma, income ≤ ₹2 lakh, ≥ 50%", deadline: "October 31", link: "https://scholarships.gov.in", tag: "Minority" },
+        { name: "Sitaram Jindal Foundation Scholarship (UG)", provider: "Sitaram Jindal Foundation", amount: "₹1,000–₹3,000/month", eligibility: "All disciplines, income ≤ ₹3 lakh, rural domicile preferred", deadline: "September 30", link: "https://sitaramjindalfoundation.org", tag: "Foundation" },
+        { name: "L'Oréal India For Young Women in Science", provider: "L'Oréal – UNESCO", amount: "₹2.5 lakh", eligibility: "Female, BSc/Integrated MSc STEM, ≥ 60% marks", deadline: "July", link: "https://www.lorealindia.com/csr", tag: "Science Girls" },
+        { name: "Reliance Foundation Scholarship (UG)", provider: "Reliance Foundation", amount: "Up to ₹4 lakh (4 years)", eligibility: "Rural, income ≤ ₹2.5 lakh, STEM or Liberal Arts", deadline: "June", link: "https://rf.foundation/scholarships", tag: "Corporate" },
+      ],
+    },
+    caste: {
+      class10: [
+        { name: "Pre-Matric Scholarship – SC Students", provider: "Ministry of Social Justice", amount: "₹1,500–₹7,000/year", eligibility: "SC category, Class 9–10, income ≤ ₹2.5 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "SC" },
+        { name: "Pre-Matric Scholarship – ST Students", provider: "Ministry of Tribal Affairs", amount: "₹1,500–₹7,000/year", eligibility: "ST category, Class 9–10, govt/aided school", deadline: "October 31", link: "https://scholarships.gov.in", tag: "ST" },
+        { name: "Pre-Matric Scholarship – OBC", provider: "Ministry of Social Justice", amount: "₹1,500–₹5,500/year", eligibility: "OBC category, Class 9–10, income ≤ ₹1 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "OBC" },
+        { name: "Dr. Ambedkar Post-Matric Prep Grant (SC/OBC)", provider: "MoSJE", amount: "₹50,000 prep grant", eligibility: "SC/OBC clearing Class 10 with ≥ 55%, income ≤ ₹6 lakh", deadline: "August", link: "https://socialjustice.gov.in", tag: "SC/OBC" },
+        { name: "Rajasthan Pre-Matric SC/ST/OBC", provider: "Rajasthan Govt.", amount: "₹8,000–₹15,000/year", eligibility: "SC/ST/OBC domicile of Rajasthan, Class 6–10", deadline: "November", link: "https://sje.rajasthan.gov.in", tag: "State Govt" },
+      ],
+      class12: [
+        { name: "Post-Matric Scholarship – SC", provider: "Ministry of Social Justice", amount: "Tuition + ₹11,000–₹19,800 maintenance/year", eligibility: "SC category, Class 11–12, income ≤ ₹2.5 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "SC" },
+        { name: "Post-Matric Scholarship – ST", provider: "Ministry of Tribal Affairs", amount: "Full tuition + ₹10,000–₹15,000 maintenance", eligibility: "ST category, any recognised institution post Class 10", deadline: "October 31", link: "https://scholarships.gov.in", tag: "ST" },
+        { name: "Post-Matric Scholarship – OBC", provider: "State Social Welfare Depts.", amount: "₹5,000–₹11,000/year", eligibility: "OBC, Class 11–12, income ≤ ₹1 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "OBC" },
+        { name: "Babu Jagjivan Ram Chhatrawas Yojana", provider: "MoSJE", amount: "Hostel accommodation grant", eligibility: "SC students in recognised institutions, income ≤ ₹3 lakh", deadline: "August", link: "https://socialjustice.gov.in", tag: "SC" },
+        { name: "Nai Udaan – Minority Class 11–12", provider: "Ministry of Minority Affairs", amount: "₹25,000/year", eligibility: "Minority students clearing Class 10 prelims, income ≤ ₹2 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "Minority" },
+      ],
+      graduation: [
+        { name: "National Fellowship & Scholarship – ST Higher Education", provider: "Ministry of Tribal Affairs", amount: "Full scholarship (UGC norms)", eligibility: "ST category, degree/PG enrolled, income ≤ ₹6 lakh", deadline: "October", link: "https://scholarships.gov.in", tag: "ST" },
+        { name: "Dr. Ambedkar Post-Matric Scholarship – OBC/EBC", provider: "MoSJE", amount: "Tuition + maintenance allowance", eligibility: "OBC/EBC, UG/PG, income ≤ ₹1 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "OBC/EBC" },
+        { name: "Rajiv Gandhi National Fellowship – SC/ST", provider: "UGC", amount: "₹25,000–₹28,000/month (JRF/SRF)", eligibility: "SC/ST, MPhil/PhD, UGC-NET qualified", deadline: "April", link: "https://www.ugc.gov.in", tag: "SC/ST Research" },
+        { name: "Maulana Azad National Fellowship (Minority)", provider: "Ministry of Minority Affairs", amount: "₹25,000–₹28,000/month", eligibility: "Minority community, MPhil/PhD, UGC-NET qualified", deadline: "March/April", link: "https://maef.nic.in", tag: "Minority" },
+        { name: "Post-Matric Scholarship SC – Degree Level", provider: "Ministry of Social Justice", amount: "Full tuition + ₹19,800 maintenance/year", eligibility: "SC category, UG/PG degree, income ≤ ₹2.5 lakh", deadline: "October 31", link: "https://scholarships.gov.in", tag: "SC" },
+      ],
+    },
+  };
+
   return (
     <div className="min-h-full">
       {/* Section tabs - single row, no duplicate sidebar */}
@@ -714,7 +775,7 @@ const fetchMyQueries = async () => {
             variant={activeSection === item.id ? "default" : "ghost"}
             size="sm"
             className="gap-1.5"
-            onClick={() => setActiveSection(item.id)}
+            onClick={() => handleSectionChange(item.id)}
           >
             <item.icon className="h-4 w-4 shrink-0" />
             {item.label}
@@ -807,25 +868,25 @@ const fetchMyQueries = async () => {
 
             const pendingAssignmentsCount = Array.isArray(assignments)
               ? assignments.filter((assignment: any) => {
-                  const assignmentCourseId = assignment.courseId ?? assignment.raw?.courseId ?? assignment.raw?.course ?? assignment.raw?.course_id ?? assignment.raw?.courses?._id ?? assignment.raw?.courses?.id ?? null;
-                  const normalizedAssignmentCourseId = typeof assignmentCourseId === "object"
-                    ? String(assignmentCourseId._id ?? assignmentCourseId.id ?? "")
-                    : String(assignmentCourseId ?? "");
-                  if (!normalizedAssignmentCourseId) return false;
-                  if (!enrolledCourseIdSet.has(normalizedAssignmentCourseId)) return false;
+                const assignmentCourseId = assignment.courseId ?? assignment.raw?.courseId ?? assignment.raw?.course ?? assignment.raw?.course_id ?? assignment.raw?.courses?._id ?? assignment.raw?.courses?.id ?? null;
+                const normalizedAssignmentCourseId = typeof assignmentCourseId === "object"
+                  ? String(assignmentCourseId._id ?? assignmentCourseId.id ?? "")
+                  : String(assignmentCourseId ?? "");
+                if (!normalizedAssignmentCourseId) return false;
+                if (!enrolledCourseIdSet.has(normalizedAssignmentCourseId)) return false;
 
-                  const assignmentId = assignment.id ?? assignment.raw?._id ?? assignment.raw?.id ?? assignment.raw?.assignment_id ?? "";
+                const assignmentId = assignment.id ?? assignment.raw?._id ?? assignment.raw?.id ?? assignment.raw?.assignment_id ?? "";
 
-                  const hasSubmission = Array.isArray(submissions) && submissions.some((s: any) => {
-                    const subAssignmentId = s.assignmentId ?? s.raw?.assignment_id ?? s.raw?.assignmentId ?? s.raw?.assignment;
-                    const subStudentId = s.studentId ?? s.raw?.student_id ?? s.raw?.studentId ?? (s.raw && (s.raw.student && (s.raw.student._id ?? s.raw.student.id)));
-                    const matchesAssignment = subAssignmentId && (String(subAssignmentId) === String(assignmentId) || String(subAssignmentId) === String(assignment.raw?._id) || String(subAssignmentId) === String(assignment.raw?.id));
-                    const matchesStudent = currentUserId && subStudentId && String(subStudentId) === String(currentUserId);
-                    return matchesAssignment && matchesStudent;
-                  });
+                const hasSubmission = Array.isArray(submissions) && submissions.some((s: any) => {
+                  const subAssignmentId = s.assignmentId ?? s.raw?.assignment_id ?? s.raw?.assignmentId ?? s.raw?.assignment;
+                  const subStudentId = s.studentId ?? s.raw?.student_id ?? s.raw?.studentId ?? (s.raw && (s.raw.student && (s.raw.student._id ?? s.raw.student.id)));
+                  const matchesAssignment = subAssignmentId && (String(subAssignmentId) === String(assignmentId) || String(subAssignmentId) === String(assignment.raw?._id) || String(subAssignmentId) === String(assignment.raw?.id));
+                  const matchesStudent = currentUserId && subStudentId && String(subStudentId) === String(currentUserId);
+                  return matchesAssignment && matchesStudent;
+                });
 
-                  return !hasSubmission;
-                }).length
+                return !hasSubmission;
+              }).length
               : 0;
 
             // Use recorded classes (studentVisibleClasses) for "upcoming" here — we also include scheduled classes from upcomingClasses state above.
@@ -1072,6 +1133,7 @@ const fetchMyQueries = async () => {
                             url: match.url ?? match.courseUrl ?? match.link ?? null,
                           };
                           if ((normalized.status ?? "").toString().toLowerCase() === "draft") return null;
+                          if (!normalized.title) return null;
                           return normalized;
                         } else if (typeof raw === "object") {
                           const normalized = {
@@ -1082,6 +1144,7 @@ const fetchMyQueries = async () => {
                             url: raw.url ?? raw.courseUrl ?? raw.link ?? null,
                           };
                           if ((normalized.status ?? "").toString().toLowerCase() === "draft") return null;
+                          if (!normalized.title) return null;
                           return normalized;
                         }
                         return null;
@@ -1091,7 +1154,7 @@ const fetchMyQueries = async () => {
                     (Array.isArray(courses) ? courses.filter((c: any) => {
                       const courseId = String(c._id ?? c.id ?? "");
                       const status = (c?.status ?? "").toString().toLowerCase();
-                      return status !== "draft" && isEnrolled(courseId);
+                      return status !== "draft" && isEnrolled(courseId) && c.title;
                     }) : [])
                   ).map((normalizedCourse: any, idx: number) => (
                     <CourseCard
@@ -1104,7 +1167,8 @@ const fetchMyQueries = async () => {
                         url: normalizedCourse.url,
                       }}
                       isEnrolled={true}
-                      onStartLearning={() => handleStartLearning(String(normalizedCourse.id))}
+                      onStartLearning={() => handleStartLearning(String(normalizedCourse.id ?? normalizedCourse._id))}
+                      onViewCourse={() => handleStartLearning(String(normalizedCourse.id ?? normalizedCourse._id))}
                     />
                   ))}
                 </div>
@@ -1133,8 +1197,8 @@ const fetchMyQueries = async () => {
                     const assignmentId = assignment.id ?? assignment.raw?._id ?? "";
 
                     const currentUserIdForMatch = user?.id ?? user?._id ?? user?.userId ?? null;
-const submission = findSubmissionForAssignment(assignment, submissions, currentUserIdForMatch);
-                    
+                    const submission = findSubmissionForAssignment(assignment, submissions, currentUserIdForMatch);
+
 
                     const dueRaw = assignment.due ?? assignment.raw?.due_date ?? assignment.raw?.dueDate ?? assignment.raw?.due ?? null;
                     const isOverdue = dueRaw ? new Date(dueRaw) < new Date() : false;
@@ -1152,7 +1216,7 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${submission.status === "graded"
                                   ? "bg-green-500/10 text-green-600"
                                   : "bg-blue-500/10 text-blue-600"
-                                }`}>
+                                  }`}>
                                   {submission.status === "graded" ? `Graded: ${submission.grade ?? "—"}/${assignment.maxScore ?? assignment.raw?.max_score ?? "—"}` : "Submitted"}
                                 </span>
                               ) : isOverdue ? (
@@ -1189,7 +1253,7 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                                   if (created) handleSubmissionCreated(created);
                                   fetchAssignments(); // REFRESH after submit
                                 }}
-                                
+
                               />
                             )}
                           </div>
@@ -1236,30 +1300,33 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                     </div>
 
                     <div className="space-y-4">
-                      {[ 
-                        { course: "Mathematics", present: 28, total: 30, percentage: 93 },
-                        { course: "Physics", present: 42, total: 45, percentage: 93 },
-                        { course: "Chemistry", present: 35, total: 40, percentage: 88 },
-                        { course: "Computer Science", present: 33, total: 35, percentage: 94 },
-                      ].map((record, index) => (
-                        <div key={`${record.course ?? 'rec'}-${index}`} className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{record.course}</h4>
-                            <span className="text-sm font-medium">{record.percentage}%</span>
+                      {getEnrolledCourseOptions().map((opt: any, index: number) => {
+                        const courseId = String(opt.id);
+                        const stats = attendanceStats?.byCourse?.[courseId] || { present: 0, total: 0 };
+                        const percentage = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0;
+                        return (
+                          <div key={`${courseId}-${index}`} className="p-4 border rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold">{opt.title}</h4>
+                              <span className="text-sm font-medium">{percentage}%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                              <span>{stats.present} / {stats.total} classes</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${percentage >= 90 ? "bg-green-500" :
+                                  percentage >= 75 ? "bg-yellow-500" : "bg-red-500"
+                                  }`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                            <span>{record.present} / {record.total} classes</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${record.percentage >= 90 ? "bg-green-500" :
-                                record.percentage >= 75 ? "bg-yellow-500" : "bg-red-500"
-                                }`}
-                              style={{ width: `${record.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                      {getEnrolledCourseOptions().length === 0 && (
+                        <div className="text-sm text-muted-foreground p-4 text-center border rounded-lg">You are not enrolled in any courses yet.</div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -1359,6 +1426,125 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
             </div>
           )}
 
+          {activeSection === "scholarships" && (() => {
+            const categories = [
+              { key: "merit", label: "🏅 Merit" },
+              { key: "need", label: "💰 Need-based" },
+              { key: "caste", label: "📋 Caste/Category" },
+            ] as const;
+            const levels = [
+              { key: "class10", label: "Class 10" },
+              { key: "class12", label: "Class 12" },
+              { key: "graduation", label: "Graduation" },
+            ] as const;
+
+            type CategoryKey = typeof categories[number]["key"];
+            type LevelKey = typeof levels[number]["key"];
+
+            const [schCat, setSchCat] = (window as any).__schCatState ??
+              (() => {
+                let v: CategoryKey = "merit";
+                const setter = (s: CategoryKey) => { v = s; (window as any).__schCatVal = s; };
+                (window as any).__schCatState = [() => (window as any).__schCatVal ?? v, setter];
+                return (window as any).__schCatState;
+              })();
+
+            const [schLvl, setSchLvl] = (window as any).__schLvlState ??
+              (() => {
+                let v: LevelKey = "class10";
+                const setter = (s: LevelKey) => { v = s; (window as any).__schLvlVal = s; };
+                (window as any).__schLvlState = [() => (window as any).__schLvlVal ?? v, setter];
+                return (window as any).__schLvlState;
+              })();
+
+            // Use React state properly via a wrapper
+            const [activeCat, setActiveCat] = [
+              (window as any).__activeCat ?? "merit" as CategoryKey,
+              (c: CategoryKey) => { (window as any).__activeCat = c; }
+            ];
+            const [activeLvl, setActiveLvl] = [
+              (window as any).__activeLvl ?? "class10" as LevelKey,
+              (l: LevelKey) => { (window as any).__activeLvl = l; }
+            ];
+
+            const currentList = (scholarshipData as any)[activeCat]?.[activeLvl] ?? [];
+
+            return (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h2 className="text-2xl font-bold">Scholarship Schemes</h2>
+                  <p className="text-muted-foreground">Government & private scholarships for rural students</p>
+                </div>
+
+                {/* Category tabs */}
+                <div className="flex gap-2 flex-wrap">
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat.key}
+                      variant={activeCat === cat.key ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { (window as any).__activeCat = cat.key; window.dispatchEvent(new Event("schchange")); }}
+                    >
+                      {cat.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Level tabs */}
+                <div className="flex gap-2 flex-wrap">
+                  {levels.map((lvl) => (
+                    <Button
+                      key={lvl.key}
+                      variant={activeLvl === lvl.key ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => { (window as any).__activeLvl = lvl.key; window.dispatchEvent(new Event("schchange")); }}
+                    >
+                      {lvl.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Scholarship cards */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {currentList.length === 0 ? (
+                    <p className="text-muted-foreground col-span-2 text-center py-8">No scholarships found for this selection.</p>
+                  ) : (
+                    currentList.map((s: any, idx: number) => (
+                      <Card key={`${s.name}-${idx}`} className="hover-scale">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base leading-snug">{s.name}</CardTitle>
+                            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">{s.tag}</span>
+                          </div>
+                          <CardDescription>{s.provider}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Amount</span>
+                            <span className="font-medium text-green-600">{s.amount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Deadline</span>
+                            <span className="font-medium">{s.deadline}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground border-t pt-2">{s.eligibility}</p>
+                          <a
+                            href={s.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block mt-1"
+                          >
+                            <Button size="sm" variant="outline" className="w-full">Apply / Learn More ↗</Button>
+                          </a>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Remaining sections (progress, library, notifications, settings) */}
           {activeSection === "progress" && (() => {
             // Compute real progress values from enrollment data
@@ -1366,12 +1552,14 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
             const enrolledCount = enrolledList.length;
 
             // Map of enrolledCourses to get progress per course
-            const progressByCourse = (Array.isArray(enrolledCourses) ? enrolledCourses : []).map((enr: any) => {
-              const raw = enr.course ?? enr.courseId ?? enr.course_id ?? enr;
-              const title = typeof raw === 'object' ? (raw.title ?? raw.name ?? 'Course') : 'Course';
-              const prog = typeof enr.progress === 'number' ? enr.progress : 0;
-              return { name: title, progress: prog };
-            });
+            const progressByCourse = (Array.isArray(enrolledCourses) ? enrolledCourses : [])
+              .map((enr: any) => {
+                const raw = enr.course ?? enr.courseId ?? enr.course_id ?? enr;
+                const title = typeof raw === 'object' ? (raw.title ?? raw.name ?? '') : '';
+                const prog = typeof enr.progress === 'number' ? enr.progress : 0;
+                return { name: title, progress: prog };
+              })
+              .filter(course => course.name);
 
             const avgProgress = progressByCourse.length > 0
               ? Math.round(progressByCourse.reduce((s, c) => s + c.progress, 0) / progressByCourse.length)
@@ -1718,7 +1906,87 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <Button variant="outline" className="w-full justify-start">
+                    {/* Change Password Dialog */}
+                    <Dialog open={changePasswordOpen} onOpenChange={(open) => {
+                      setChangePasswordOpen(open);
+                      if (!open) { setNewPassword(""); setConfirmNewPassword(""); }
+                    }}>
+                      <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Change Password</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="new-password">New Password</Label>
+                            <Input
+                              id="new-password"
+                              type="password"
+                              placeholder="••••••••"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                            {newPassword.length > 0 && newPassword.length < 6 && (
+                              <p className="text-xs text-destructive mt-1">
+                                ⚠ Password must be more than 6 characters.
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                            <Input
+                              id="confirm-new-password"
+                              type="password"
+                              placeholder="••••••••"
+                              value={confirmNewPassword}
+                              onChange={(e) => setConfirmNewPassword(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setChangePasswordOpen(false);
+                              setNewPassword("");
+                              setConfirmNewPassword("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (newPassword.length < 6) {
+                                toast({
+                                  title: "Password Too Short",
+                                  description: "Password length should be more than 6 characters.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              if (newPassword !== confirmNewPassword) {
+                                toast({
+                                  title: "Passwords Don't Match",
+                                  description: "The passwords you entered do not match.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              toast({
+                                title: "Password Changed",
+                                description: "Your password has been updated successfully.",
+                              });
+                              setChangePasswordOpen(false);
+                              setNewPassword("");
+                              setConfirmNewPassword("");
+                            }}
+                          >
+                            Save Password
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setChangePasswordOpen(true)}>
                       Change Password
                     </Button>
                     <Button variant="outline" className="w-full justify-start">
@@ -1732,7 +2000,104 @@ const submission = findSubmissionForAssignment(assignment, submissions, currentU
               </Card>
             </div>
           )}
+
+          {/* ===== SCHOLARSHIPS SECTION ===== */}
+          {activeSection === "scholarships" && (
+            <div className="space-y-6 animate-fade-in p-4">
+              <div>
+                <h2 className="text-2xl font-bold">🎓 Scholarships for Rural Students</h2>
+                <p className="text-muted-foreground mt-1">
+                  Real government &amp; private scholarships — filter by type and education level
+                </p>
+              </div>
+
+              {/* Type Filter */}
+              <div className="flex flex-wrap gap-3">
+                <div className="flex gap-2 flex-wrap">
+                  {(["merit", "need", "caste"] as const).map((type) => (
+                    <Button
+                      key={type}
+                      size="sm"
+                      variant={scholarshipType === type ? "default" : "outline"}
+                      onClick={() => setScholarshipType(type)}
+                    >
+                      {type === "merit" ? "🏆 Merit" : type === "need" ? "💰 Need-Based" : "🏷️ Caste/Category"}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {(["class10", "class12", "graduation"] as const).map((lvl) => (
+                    <Button
+                      key={lvl}
+                      size="sm"
+                      variant={scholarshipLevel === lvl ? "default" : "outline"}
+                      onClick={() => setScholarshipLevel(lvl)}
+                    >
+                      {lvl === "class10" ? "Class 10" : lvl === "class12" ? "Class 12" : "Graduation"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Result count badge */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                  {scholarshipData[scholarshipType][scholarshipLevel].length} scholarships found
+                </span>
+                <span>
+                  for {scholarshipLevel === "class10" ? "Class 10" : scholarshipLevel === "class12" ? "Class 12" : "Graduation"}
+                  {" · "}
+                  {scholarshipType === "merit" ? "Merit-based" : scholarshipType === "need" ? "Need-based" : "Caste/Category"}
+                </span>
+              </div>
+
+              {/* Cards Grid */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {scholarshipData[scholarshipType][scholarshipLevel].map((s, i) => (
+                  <Card key={i} className="hover:shadow-md transition-shadow border border-border">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-base leading-snug">{s.name}</CardTitle>
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap">
+                          {s.tag}
+                        </span>
+                      </div>
+                      <CardDescription className="text-xs mt-1">{s.provider}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="text-green-600 dark:text-green-400 font-semibold text-base">{s.amount}</div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-0.5">Eligibility</p>
+                        <p className="text-xs">{s.eligibility}</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-border/50 mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          📅 Deadline: <span className="font-medium text-foreground">{s.deadline}</span>
+                        </p>
+                        <a href={s.link} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="h-7 text-xs">Apply →</Button>
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground pt-2 border-t border-border/40">
+                * Data sourced from <strong>scholarships.gov.in</strong> (NSP), UGC, DST, AICTE and state portals.
+                Deadlines may vary year to year — always verify on the official portal before applying.
+              </p>
+            </div>
+          )}
         </div>
+        <CourseLecturesDialog 
+          courseId={lecturesCourseId} 
+          onClose={() => setLecturesCourseId(null)} 
+          onProgressUpdated={() => {
+            fetchEnrolledCourses();
+            fetchAttendanceStats();
+          }} 
+        />
       </main>
     </div>
   );

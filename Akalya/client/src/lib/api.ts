@@ -318,6 +318,7 @@ export const classesAPI = {
     isDownloadable?: boolean;
     isPublic?: boolean;
     hasVideo?: boolean;
+    unit?: number;
   }) => {
     return apiFetch('/classes', {
       method: 'POST',
@@ -375,10 +376,10 @@ export const enrollmentsAPI = {
   },
   
 
-  update: async (id: string, progress: number) => {
+  update: async (id: string, data: { progress?: number; completedUnits?: number[] }) => {
     return apiFetch(`/enrollments/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ progress }),
+      body: JSON.stringify(data),
     });
   },
 };
@@ -525,6 +526,12 @@ export const usersAPI = {
 
   getById: async (id: string) => {
     return apiFetch(`/users/${id}`);
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/users/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 

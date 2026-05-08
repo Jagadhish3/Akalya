@@ -12,6 +12,7 @@ const ClassSchema = new Schema({
   transcript: String,
   isDownloadable: { type: Boolean, default: false },
   isPublic: { type: Boolean, default: false },
+  unit: { type: Number, min: 1, max: 6 },
 }, { timestamps: true });
 
 export default mongoose.model('Class', ClassSchema);

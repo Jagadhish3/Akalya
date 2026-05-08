@@ -81,6 +81,11 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     if (progress !== undefined) enrollment.progress = Math.max(0, Math.min(100, progress));
+    
+    if (req.body.completedUnits !== undefined) {
+      enrollment.completedUnits = req.body.completedUnits;
+    }
+
     await enrollment.save();
     await enrollment.populate({
       path: 'courseId',

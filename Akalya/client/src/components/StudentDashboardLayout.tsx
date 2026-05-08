@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   User,
+  Bell,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
@@ -138,10 +140,18 @@ export function StudentDashboardLayout() {
           </Link>
 
           {/* Profile - link to settings section on dashboard */}
-          <Link to={basePath} className="mt-1 block">
-            <Button variant="ghost" className={`w-full justify-start gap-2 ${!sidebarOpen ? "px-2" : "px-4"}`}>
+          <Link to={`${basePath}?section=settings`} className="mt-1 block">
+            <Button variant={location.search.includes("section=settings") ? "secondary" : "ghost"} className={`w-full justify-start gap-2 ${!sidebarOpen ? "px-2" : "px-4"}`}>
               <User className="h-4 w-4 shrink-0" />
               {sidebarOpen && "Profile"}
+            </Button>
+          </Link>
+
+          {/* Notifications */}
+          <Link to={`${basePath}?section=notifications`} className="mt-1 block">
+            <Button variant={location.search.includes("section=notifications") ? "secondary" : "ghost"} className={`w-full justify-start gap-2 ${!sidebarOpen ? "px-2" : "px-4"}`}>
+              <Bell className="h-4 w-4 shrink-0" />
+              {sidebarOpen && "Notifications"}
             </Button>
           </Link>
         </div>

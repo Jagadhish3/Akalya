@@ -13,6 +13,11 @@ function getWebsiteReply(query: string): string {
   const q = query.toLowerCase();
   if (!q.trim()) return "Please type your question.";
 
+  // Greetings
+  if (q.includes("hello") || q.includes("hi ") || q.trim() === "hi" || q.includes("hey")) {
+    return "Hello! I am the Student Help Bot. I can guide you on how to use the Akalya website features like Scholarships, Exams, Jobs, and Courses.";
+  }
+
   if (q.includes("scholarship")) {
     return "Open Career Gateway -> Scholarships from your student dashboard to see eligibility and deadline details.";
   }
@@ -22,26 +27,45 @@ function getWebsiteReply(query: string): string {
   if (q.includes("assignment")) {
     return "Go to Student Dashboard -> Assignments to view pending tasks and submit your work.";
   }
-  if (q.includes("course") || q.includes("enroll")) {
+  if (q.includes("course") || q.includes("enroll") || q.includes("learn") || q.includes("class")) {
     return "Use Student Dashboard -> Explore to enroll in courses, then check My Courses to continue learning.";
   }
-  if (q.includes("practice") || q.includes("mock") || q.includes("test series")) {
+  if (q.includes("practice") || q.includes("mock") || q.includes("test")) {
     return "Use Career Gateway -> Practice or Test Series for MCQs, timed tests, and score review.";
   }
-  if (q.includes("locker") || q.includes("certificate")) {
-    return "Use Career Gateway -> My Locker to upload and manage certificates securely.";
+  if (q.includes("locker") || q.includes("certificate") || q.includes("upload") || q.includes("document")) {
+    return "Use Career Gateway -> My Locker to upload and manage your certificates securely.";
   }
-  if (q.includes("login") || q.includes("sign in") || q.includes("auth")) {
-    return "Use the Login page to sign in, then open your student dashboard for all features.";
+  if (q.includes("login") || q.includes("sign in") || q.includes("password") || q.includes("profile")) {
+    return "You can update your profile and password from the Profile section in the left sidebar. If you forgot your password, contact your administrator.";
   }
-  if (q.includes("career roadmap") || q.includes("roadmap") || q.includes("job")) {
-    return "Use Career Gateway -> Career Roadmap for guidance and Jobs modules for post-10th/post-12th options.";
+  if (q.includes("job") || q.includes("career") || q.includes("roadmap") || q.includes("work")) {
+    return "Use Career Gateway to explore 'Jobs After 10th' and 'Jobs After 12th', or use the Career Roadmap generator.";
   }
-  if (q.includes("contact") || q.includes("support")) {
-    return "For support, open the Contact page from the website navigation.";
+  if (q.includes("certification") || q.includes("skill")) {
+    return "Open Career Gateway -> Certifications to explore government and professional courses like ITI, PMKVY, and Coursera.";
+  }
+  if (q.includes("contact") || q.includes("support") || q.includes("help")) {
+    return "For direct support, you can open the Contact page from the website navigation.";
+  }
+  if (q.includes("about") || q.includes("akalya") || q.includes("this website")) {
+    return "Akalya is a platform for rural student empowerment. You can find scholarships, exams, jobs, and courses here.";
+  }
+  if (q.includes("notification") || q.includes("alert") || q.includes("message")) {
+    return "You can check your Notifications from the left sidebar to stay updated on new assignments, classes, and course enrollments.";
+  }
+  if (q.includes("attendance")) {
+    return "Check your Attendance section on the Dashboard to see your present/absent history for all enrolled courses.";
+  }
+  if (q.includes("doubt") || q.includes("query") || q.includes("question") || q.includes("ask")) {
+    return "Use the Doubt Clearance section on your Dashboard to ask questions to your teachers and view responses.";
+  }
+  if (q.includes("progress") || q.includes("grade") || q.includes("score")) {
+    return "Open the Progress section to track your overall grades and course completion status.";
   }
 
-  return WEBSITE_SCOPE_NOTE;
+  // Unrelated questions fallback
+  return "Please ask questions related to this website only. I can help you with features like scholarships, exams, courses, attendance, doubt clearance, and jobs.";
 }
 
 export function StudentWebsiteChatbot() {
