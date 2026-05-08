@@ -9,7 +9,7 @@ import {
   LogOut, Menu, X, Shield, Activity, Trash2, Edit, RefreshCw
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { usersAPI, coursesAPI, assignmentsAPI, attendanceAPI } from "@/lib/api";
+import { usersAPI, coursesAPI, assignmentsAPI, attendanceAPI, forumAPI, announcementsAPI, resourcesAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -56,19 +56,10 @@ export default function AdminDashboard() {
   });
 
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
-
-  // demo data for forum / resources / announcements if backend not present
-  const [forumPosts, setForumPosts] = useState<any[]>([
-    { id: "f1", user: "Student123", topic: "Help with Mathematics Assignment", category: "Q&A", replies: 5, time: "2 hours ago" },
-    { id: "f2", user: "TeacherJohn", topic: "New Study Resources Available", category: "Announcements", replies: 12, time: "5 hours ago" },
-    { id: "f3", user: "Student456", topic: "Physics Lab Discussion", category: "Discussions", replies: 8, time: "1 day ago" },
-  ]);
-
-  const [resources, setResources] = useState<any[]>([
-    { id: "r1", title: "Teacher Guidelines", type: "PDF", size: "5.2 MB", downloads: 234, uploadedAt: new Date().toISOString() },
-    { id: "r2", title: "Student Handbook", type: "PDF", size: "8.7 MB", downloads: 567, uploadedAt: new Date().toISOString() },
-    { id: "r3", title: "Platform Tutorial Videos", type: "ZIP", size: "125 MB", downloads: 189, uploadedAt: new Date().toISOString() },
-  ]);
+  const [enrollmentStats, setEnrollmentStats] = useState<any[]>([]);
+  const [forumPosts, setForumPosts] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
 
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
@@ -97,10 +88,14 @@ export default function AdminDashboard() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [usersRaw, coursesRaw, assignmentsRaw] = await Promise.all([
+      const [usersRaw, coursesRaw, assignmentsRaw, forumRaw, announcementsRaw, resourcesRaw, enrollmentStatsRaw] = await Promise.all([
         usersAPI.getAll().catch((e: any) => { console.error("usersAPI.getAll error", e); return []; }),
         coursesAPI.getAll().catch((e: any) => { console.error("coursesAPI.getAll error", e); return []; }),
         assignmentsAPI.getAll().catch((e: any) => { console.error("assignmentsAPI.getAll error", e); return []; }),
+        forumAPI.getAll().catch((e: any) => { console.error("forumAPI.getAll error", e); return []; }),
+        announcementsAPI.getAll().catch((e: any) => { console.error("announcementsAPI.getAll error", e); return []; }),
+        resourcesAPI.getAll().catch((e: any) => { console.error("resourcesAPI.getAll error", e); return []; }),
+        coursesAPI.getEnrollmentStats().catch((e: any) => { console.error("enrollmentStats error", e); return []; }),
       ]);
 
       const usersData = Array.isArray(usersRaw) ? usersRaw : (usersRaw ? asArray(usersRaw) : []);
@@ -135,6 +130,10 @@ export default function AdminDashboard() {
       setUsers(usersList);
       setCourses(coursesList);
       setAssignments(assignmentsList);
+      setForumPosts(asArray(forumRaw));
+      setAnnouncements(asArray(announcementsRaw));
+      setResources(asArray(resourcesRaw));
+      setEnrollmentStats(asArray(enrollmentStatsRaw));
 
       // stats
       const studentsCount = usersList.filter(u => (u.role ?? "").toString().toLowerCase() === "student").length;
@@ -224,11 +223,25 @@ export default function AdminDashboard() {
     }
   };
 
-  // resources upload (mock) — replace with upload API if available
-  const handleUploadResource = () => {
-    const id = "r" + Math.random().toString(36).slice(2, 9);
-    setResources(prev => [{ id, title: `New resource ${id}`, type: "PDF", size: "1.2 MB", downloads: 0, uploadedAt: new Date().toISOString() }, ...prev]);
-    toast({ title: "Uploaded", description: "Resource added (demo)" });
+  // resources upload
+  const handleUploadResource = async () => {
+    const title = prompt("Resource Title:");
+    if (!title) return;
+    const role = prompt("Target Audience (all/student/teacher):", "all");
+    const targetRole = (role === "student" || role === "teacher") ? role : "all";
+    
+    try {
+      await resourcesAPI.create({ 
+        title, 
+        type: "book", 
+        description: `Admin uploaded resource for ${targetRole}`, 
+        targetRole 
+      });
+      toast({ title: "Uploaded", description: `Resource added for ${targetRole}` });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   // send announcement (calls API if available)
@@ -238,12 +251,12 @@ export default function AdminDashboard() {
       return;
     }
     try {
-      // if you have an announcementsAPI, call it here. For now mock sending
-      // await announcementsAPI.create({ title: announcementTitle, message: announcementMessage, audience: announcementAudience });
+      await announcementsAPI.create({ title: announcementTitle, message: announcementMessage, audience: announcementAudience });
       setAnnouncementTitle("");
       setAnnouncementMessage("");
       setAnnouncementAudience("All Users");
-      toast({ title: "Announcement sent", description: "Message broadcast to selected audience" });
+      toast({ title: "Announcement sent", description: "Message broadcast successfully" });
+      fetchAllData();
     } catch (err: any) {
       console.error("send announcement error", err);
       toast({ title: "Error", description: err?.message ?? "Failed to send announcement", variant: "destructive" });
@@ -564,8 +577,8 @@ export default function AdminDashboard() {
                       {assignments.map(a => {
                         const aKey = idOf(a) || Math.random().toString(36).slice(2,9);
                         const due = a.due_date ?? a.dueDate ?? a.due ?? null;
-                        const courseTitle = a.courses?.title ?? a.courseTitle ?? a.course?.title ?? "Unknown";
-                        const teacherName = a.profiles?.full_name ?? a.teacher?.fullName ?? "Unknown";
+                        const courseTitle = a.courseId?.title ?? a.courseTitle ?? a.course?.title ?? "Unknown";
+                        const teacherName = a.teacherId?.fullName ?? a.teacher?.fullName ?? "Unknown";
                         const status = a.status ?? "unknown";
                         return (
                           <TableRow key={aKey}>
@@ -628,18 +641,17 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {courses.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No courses yet.</p>
-                    ) : courses.slice(0, 6).map((course, idx) => {
-                      const cid = idOf(course) || String(idx);
+                    {!attendanceSummary || !attendanceSummary.byCourse || attendanceSummary.byCourse.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No course attendance data yet.</p>
+                    ) : attendanceSummary.byCourse.map((c: any, idx: number) => {
                       return (
-                        <div key={cid} className="space-y-2">
+                        <div key={c.courseId || idx} className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium">{course.title}</span>
-                            <span className="text-sm text-muted-foreground">—</span>
+                            <span className="font-medium">{c.title}</span>
+                            <span className="text-sm text-muted-foreground">{Math.round(c.percentage)}%</span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
-                            <div className="bg-primary h-2 rounded-full" style={{ width: '0%' }} />
+                            <div className="bg-primary h-2 rounded-full" style={{ width: `${c.percentage}%` }} />
                           </div>
                         </div>
                       );
@@ -670,13 +682,18 @@ export default function AdminDashboard() {
                     {forumPosts.map((post) => (
                       <div key={post.id} className="p-4 border rounded-lg flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-sm mb-1">{post.topic}</h4>
-                          <p className="text-xs text-muted-foreground mb-2">by {post.user} in {post.category}</p>
-                          <p className="text-xs text-muted-foreground">{post.replies} replies • {post.time}</p>
+                          <h4 className="font-semibold text-sm mb-1">{post.title}</h4>
+                          <p className="text-xs text-muted-foreground mb-2">by {post.author?.fullName || "Unknown"} in {post.category}</p>
+                          <p className="text-xs text-muted-foreground">{post.replies?.length || 0} replies • {safeFormat(post.createdAt, "PPP")}</p>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => toast({ title: "View", description: "Open thread" })}>View</Button>
-                          <Button size="sm" variant="destructive" onClick={() => setForumPosts(prev => prev.filter(p => p.id !== post.id))}>Remove</Button>
+                          <Button size="sm" variant="ghost" onClick={() => toast({ title: "View", description: "Thread view not implemented" })}>View</Button>
+                          <Button size="sm" variant="destructive" onClick={async () => {
+                            if (!confirm("Delete this post?")) return;
+                            await forumAPI.delete(post._id);
+                            toast({ title: "Removed", description: "Post deleted" });
+                            fetchAllData();
+                          }}>Remove</Button>
                         </div>
                       </div>
                     ))}
@@ -708,13 +725,15 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {courses.slice(0, 6).map((course, idx) => (
-                      <div key={idOf(course) || idx} className="p-3 border rounded-lg flex items-center justify-between">
+                    {enrollmentStats.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No enrollment data yet.</p>
+                    ) : enrollmentStats.slice(0, 6).map((stat, idx) => (
+                      <div key={stat.courseId || idx} className="p-3 border rounded-lg flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-sm">{course.title}</p>
-                          <p className="text-xs text-muted-foreground">{Math.floor(50 + Math.random() * 100)} enrollments</p>
+                          <p className="font-medium text-sm">{stat.title}</p>
+                          <p className="text-xs text-muted-foreground">{stat.count} enrollments</p>
                         </div>
-                        <Badge>{Math.floor(75 + Math.random() * 25)}%</Badge>
+                        <Badge>{stat.count > 0 ? "Active" : "New"}</Badge>
                       </div>
                     ))}
                   </div>

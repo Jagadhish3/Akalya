@@ -187,6 +187,7 @@ export const coursesAPI = {
       method: 'DELETE',
     });
   },
+  getEnrollmentStats: async () => apiFetch('/courses/stats/enrollments'),
 };
 
 /* -------------------------
@@ -598,6 +599,30 @@ export const preparationResourcesAPI = {
   update: async (id: string, data: any) => apiFetch(`/preparation-resources/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: async (id: string) => apiFetch(`/preparation-resources/${id}`, { method: "DELETE" }),
 };
+
+/* -------------------------   Forum API   ------------------------- */
+export const forumAPI = {
+  getAll: async () => apiFetch('/forum'),
+  create: async (data: { title: string; content: string; category?: string }) =>
+    apiFetch('/forum', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: string) => apiFetch(`/forum/${id}`, { method: 'DELETE' }),
+};
+
+/* -------------------------   Announcements API   ------------------------- */
+export const announcementsAPI = {
+  getAll: async () => apiFetch('/announcements'),
+  create: async (data: { title: string; message: string; audience: string }) =>
+    apiFetch('/announcements', { method: 'POST', body: JSON.stringify(data) }),
+  delete: async (id: string) => apiFetch(`/announcements/${id}`, { method: 'DELETE' }),
+};
+
+/* -------------------------   Resources API   ------------------------- */
+export const resourcesAPI = {
+  getAll: async (params?: { type?: string; classLevel?: string }) => preparationResourcesAPI.getAll(params),
+  create: async (data: any) => preparationResourcesAPI.create(data),
+  delete: async (id: string) => preparationResourcesAPI.delete(id),
+};
+
 
 /* -------------------------   Practice API (Class 6–12)   ------------------------- */
 export const practiceAPI = {

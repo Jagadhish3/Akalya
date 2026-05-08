@@ -151,6 +151,8 @@ const translationsMap: Record<Language, Record<string, string>> = {
     'nav.settings': 'Settings',
     'nav.notifications': 'Notifications',
     'nav.analytics': 'Analytics',
+    'nav.announcements': 'Announcements',
+    'nav.queries': 'Queries',
     
     // Roles
     'role.student': 'Student',
@@ -411,6 +413,8 @@ const translationsMap: Record<Language, Record<string, string>> = {
     'nav.settings': 'सेटिंग्स',
     'nav.notifications': 'सूचनाएं',
     'nav.analytics': 'विश्लेषण',
+    'nav.announcements': 'घोषणाएं',
+    'nav.queries': 'पूछताछ',
     
     // Roles
     'role.student': 'छात्र',
@@ -526,6 +530,8 @@ const translationsMap: Record<Language, Record<string, string>> = {
     'nav.settings': 'సెట్టింగ్లు',
     'nav.notifications': 'నోటిఫికేషన్లు',
     'nav.analytics': 'విశ్లేషణ',
+    'nav.announcements': 'ప్రకటనలు',
+    'nav.queries': 'ప్రశ్నలు',
     
     // Roles
     'role.student': 'విద్యార్థి',
@@ -641,6 +647,8 @@ const translationsMap: Record<Language, Record<string, string>> = {
     'nav.settings': 'ਸੈਟਿੰਗਾਂ',
     'nav.notifications': 'ਸੂਚਨਾਵਾਂ',
     'nav.analytics': 'ਵਿਸ਼ਲੇਸ਼ਣ',
+    'nav.announcements': 'ਘੋਸ਼ਣਾਵਾਂ',
+    'nav.queries': 'ਪੁੱਛਗਿੱਛ',
     
     // Roles
     'role.student': 'ਵਿਦਿਆਰਥੀ',

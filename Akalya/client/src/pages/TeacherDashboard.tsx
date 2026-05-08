@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Home, BookOpen, Plus, FileText, Calendar,
   MessageSquare, TrendingUp, Upload, Bell, Settings,
-  LogOut, Menu, X, Users
+  LogOut, Menu, X, Users, Megaphone
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
-import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI } from "@/lib/api";
+import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI, announcementsAPI, resourcesAPI } from "@/lib/api";
 import { CreateCourseDialog } from "@/components/CreateCourseDialog";
 import { EditCourseDialog } from "@/components/EditCourseDialog";
 import { CourseCard } from "@/components/CourseCard";
@@ -63,6 +63,8 @@ export default function TeacherDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [queries, setQueries] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [libraryResources, setLibraryResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Manage course UI state
@@ -97,6 +99,10 @@ export default function TeacherDashboard() {
     }
     if (activeSection === "resources") {
       fetchClasses();
+      fetchLibraryResources();
+    }
+    if (activeSection === "announcements") {
+      fetchAnnouncements();
     }
 
     // manage polling for dashboard
@@ -195,11 +201,30 @@ export default function TeacherDashboard() {
   const fetchQueries = async () => {
     try {
       const data = await queriesAPI.getAll();
-      const list = Array.isArray(data) ? data : (data?.items ?? []);
-      setQueries(list);
-    } catch (err: any) {
+      setQueries(Array.isArray(data) ? data : []);
+    } catch (err) {
       console.error("fetchQueries error", err);
       setQueries([]);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const data = await announcementsAPI.getAll();
+      setAnnouncements(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("fetchAnnouncements error", err);
+    }
+  };
+
+  const fetchLibraryResources = async () => {
+    try {
+      const data = await resourcesAPI.getAll();
+      const all = Array.isArray(data) ? data : [];
+      // filter for teacher or all
+      setLibraryResources(all.filter((r: any) => r.targetRole === "all" || r.targetRole === "teacher"));
+    } catch (err) {
+      console.error("fetchLibraryResources error", err);
     }
   };
   
@@ -383,15 +408,16 @@ export default function TeacherDashboard() {
 
   const menuItems = [
     { id: "dashboard", label: t('nav.dashboard'), icon: Home },
+    { id: "announcements", label: t('nav.announcements'), icon: Megaphone },
     { id: "courses", label: t('courses.manage'), icon: BookOpen },
     { id: "create", label: t('courses.create'), icon: Plus },
     { id: "assignments", label: t('nav.assignments'), icon: FileText },
     { id: "attendance", label: t('student.attendance'), icon: Calendar },
-    { id: "queries", label: t('teacher.studentQueries'), icon: MessageSquare },
+    { id: "queries", label: t('nav.queries'), icon: MessageSquare },
     { id: "analytics", label: t('nav.analytics'), icon: TrendingUp },
     { id: "resources", label: t('teacher.resources'), icon: Upload },
-    { id: "notifications", label: t('nav.notifications'), icon: Bell },
-    { id: "settings", label: t('nav.settings'), icon: Settings },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "settings", label: t('nav.settings') || "Settings", icon: Settings },
   ];
 
   // Helper to resolve a readable student label
@@ -517,11 +543,16 @@ export default function TeacherDashboard() {
         <header className="bg-card border-b p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">{t('teacher.dashboard')}</h1>
+              <h1 className="text-3xl font-bold">Teacher Management Dashboard</h1>
               <p className="text-muted-foreground">{t('teacher.welcomeBack')}, {user?.fullName}</p>
             </div>
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon"><Bell className="h-5 w-5" /></Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setActiveSection("announcements")}>
+                <Megaphone className="h-5 w-5" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setActiveSection("notifications")}>
+                <Bell className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </header>
@@ -665,6 +696,29 @@ export default function TeacherDashboard() {
                         })
                       ) : (
                         <div className="p-4 text-sm text-muted-foreground">No student queries yet.</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Announcements</CardTitle>
+                    <CardDescription>Latest updates from administration</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {announcements.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No recent announcements.</p>
+                      ) : announcements.slice(0, 3).map((ann, idx) => (
+                        <div key={ann._id || idx} className="p-3 border rounded-lg bg-primary/5">
+                          <h4 className="font-semibold text-sm">{ann.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ann.message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{safeFormatDate(ann.createdAt, "PP")}</p>
+                        </div>
+                      ))}
+                      {announcements.length > 0 && (
+                        <Button variant="link" className="w-full text-xs" onClick={() => setActiveSection("announcements")}>View All</Button>
                       )}
                     </div>
                   </CardContent>
@@ -1018,6 +1072,66 @@ export default function TeacherDashboard() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resource Files</CardTitle>
+                  <CardDescription>Documents and assets available to you</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {libraryResources.length === 0 ? (
+                      <p className="text-sm text-muted-foreground col-span-full text-center py-8">No library resources available yet.</p>
+                    ) : libraryResources.map((res, index) => (
+                      <div key={res._id || index} className="p-4 border rounded-lg flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded">
+                          <FileText className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm truncate">{res.title}</h4>
+                          <p className="text-xs text-muted-foreground">{res.type || "Resource"} {res.subject ? `• ${res.subject}` : ""}</p>
+                          {res.url && (
+                            <a href={res.url} target="_blank" rel="noopener noreferrer">
+                              <Button size="sm" variant="link" className="px-0 h-auto text-xs">Download</Button>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeSection === "announcements" && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h2 className="text-2xl font-bold">Platform Announcements</h2>
+                <p className="text-muted-foreground">Updates and broadcasts from administration</p>
+              </div>
+
+              {announcements.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No announcements at this time.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {announcements.map((ann, idx) => (
+                    <Card key={ann._id || idx} className="border-l-4 border-l-primary">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{ann.title}</CardTitle>
+                        <CardDescription>{safeFormatDate(ann.createdAt, "PPP")}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm whitespace-pre-wrap">{ann.message}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

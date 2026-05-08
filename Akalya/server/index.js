@@ -23,6 +23,8 @@ import practiceRouter from './routes/practice.js';
 import mockTestsRouter from './routes/mockTests.js';
 import lockerRouter from './routes/locker.js';
 import notificationsRouter from './routes/notifications.js';
+import forumRouter from './routes/forum.js';
+import announcementsRouter from './routes/announcements.js';
 
 dotenv.config();
 
@@ -147,6 +149,8 @@ app.use('/api/practice', practiceRouter);
 app.use('/api/mock-tests', mockTestsRouter);
 app.use('/api/locker', lockerRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/forum', forumRouter);
+app.use('/api/announcements', announcementsRouter);
 
 /* ---------------------------------------------------
    HEALTH CHECK

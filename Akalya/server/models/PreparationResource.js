@@ -9,6 +9,7 @@ const preparationResourceSchema = new mongoose.Schema({
   examIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "EntranceExam" }],
   classLevel: { type: String, trim: true }, // 6-12 or "all"
   subject: { type: String, trim: true },
+  targetRole: { type: String, enum: ["all", "teacher", "student"], default: "all" },
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   createdAt: { type: Date, default: Date.now },

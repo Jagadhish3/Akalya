@@ -43,4 +43,25 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+// Delete user (admin only)
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Optional: Prevent admin from deleting themselves
+    if (String(user._id) === String(req.user._id)) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 export default router;

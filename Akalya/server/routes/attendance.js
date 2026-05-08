@@ -118,12 +118,50 @@ router.get('/summary', authenticate, requireRole('admin'), async (req, res) => {
     const present = await Attendance.countDocuments({ status: 'present' });
     const studentCount = await User.countDocuments({ role: 'student' });
 
+    // Per-course breakdown
+    const byCourse = await Attendance.aggregate([
+      {
+        $group: {
+          _id: '$courseId',
+          total: { $sum: 1 },
+          present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } }
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'course'
+        }
+      },
+      {
+        $unwind: '$course'
+      },
+      {
+        $project: {
+          courseId: '$_id',
+          title: '$course.title',
+          total: 1,
+          present: 1,
+          percentage: {
+            $cond: [
+              { $gt: ['$total', 0] },
+              { $multiply: [{ $divide: ['$present', '$total'] }, 100] },
+              0
+            ]
+          }
+        }
+      }
+    ]);
+
     res.json({
       total,
       present,
       absent: total - present,
       percentage: total > 0 ? parseFloat(((present / total) * 100).toFixed(1)) : 0,
-      activeStudents: studentCount
+      activeStudents: studentCount,
+      byCourse
     });
   } catch (err) {
     console.error('[GET /api/attendance/summary] error:', err);

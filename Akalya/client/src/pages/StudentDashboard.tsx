@@ -24,6 +24,8 @@ import {
   queriesAPI,
   attendanceAPI,
   notificationsAPI,
+  announcementsAPI,
+  resourcesAPI,
 } from "@/lib/api";
 import { CourseCard } from "@/components/CourseCard";
 import { SubmitAssignmentDialog } from "@/components/SubmitAssignmentDialog";
@@ -68,6 +70,8 @@ export default function StudentDashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [libraryResources, setLibraryResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -221,6 +225,12 @@ export default function StudentDashboard() {
       if (activeSection === "notifications") {
         await fetchNotifications();
       }
+      if (activeSection === "announcements") {
+        await fetchAnnouncements();
+      }
+      if (activeSection === "library") {
+        await fetchLibraryResources();
+      }
     })();
 
     // Real-time-ish updates for courses/assignments while the student stays on page.
@@ -285,6 +295,26 @@ export default function StudentDashboard() {
       setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("fetchNotifications error", err);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const data = await announcementsAPI.getAll();
+      setAnnouncements(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("fetchAnnouncements error", err);
+    }
+  };
+
+  const fetchLibraryResources = async () => {
+    try {
+      const data = await resourcesAPI.getAll();
+      const all = Array.isArray(data) ? data : [];
+      // filter for student or all
+      setLibraryResources(all.filter((r: any) => r.targetRole === "all" || r.targetRole === "student"));
+    } catch (err) {
+      console.error("fetchLibraryResources error", err);
     }
   };
 
@@ -608,8 +638,9 @@ export default function StudentDashboard() {
     { id: "enrolled", label: t("courses.myCourses"), icon: GraduationCap },
     { id: "assignments", label: t("nav.assignments"), icon: FileText },
     { id: "attendance", label: "Attendance", icon: Calendar },
-    { id: "doubt", label: "Doubt Clearance", icon: MessageSquare },
-    { id: "progress", label: "Progress", icon: TrendingUp },
+    { id: "doubt", label: t("student.doubts") || "Doubts", icon: MessageSquare },
+    { id: "announcements", label: "Announcements", icon: Bell },
+    { id: "notifications", label: t("student.notifications") || "Notifications", icon: Bell },
     { id: "library", label: t("nav.library"), icon: Library },
   ];
 
@@ -1727,14 +1758,9 @@ export default function StudentDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {[
-                      { title: "Advanced Mathematics Textbook", type: "PDF", size: "12.5 MB", downloads: 234 },
-                      { title: "Physics Lab Manual", type: "PDF", size: "8.2 MB", downloads: 189 },
-                      { title: "Chemistry Reference Guide", type: "PDF", size: "15.7 MB", downloads: 156 },
-                      { title: "Programming Fundamentals", type: "PDF", size: "10.3 MB", downloads: 298 },
-                      { title: "Research Paper Collection", type: "ZIP", size: "45.1 MB", downloads: 67 },
-                      { title: "Study Notes - Semester 1", type: "PDF", size: "5.8 MB", downloads: 421 },
-                    ].map((resource, index) => (
+                    {libraryResources.length === 0 ? (
+                      <p className="text-sm text-muted-foreground col-span-full text-center py-8">No library resources available yet.</p>
+                    ) : libraryResources.map((resource, index) => (
                       <Card key={`${resource.title?.slice(0, 20) ?? 'res'}-${index}`} className="hover-scale">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
@@ -1744,13 +1770,17 @@ export default function StudentDashboard() {
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-sm mb-1 truncate">{resource.title}</h4>
                               <p className="text-xs text-muted-foreground mb-2">
-                                {resource.type} • {resource.size}
+                                {resource.type || "Resource"} {resource.subject ? `• ${resource.subject}` : ""}
                               </p>
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">
-                                  {resource.downloads} downloads
+                                  {resource.classLevel ? `Class: ${resource.classLevel}` : ""}
                                 </span>
-                                <Button size="sm" variant="outline">Download</Button>
+                                {resource.url && (
+                                  <a href={resource.url} target="_blank" rel="noopener noreferrer">
+                                    <Button size="sm" variant="ghost">Download</Button>
+                                  </a>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1763,6 +1793,36 @@ export default function StudentDashboard() {
             </div>
           )}
 
+          {activeSection === "announcements" && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h2 className="text-2xl font-bold">Platform Announcements</h2>
+                <p className="text-muted-foreground">Important updates and broadcasts from administration</p>
+              </div>
+
+              {announcements.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No announcements at this time.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {announcements.map((ann, idx) => (
+                    <Card key={ann._id || idx} className="border-l-4 border-l-primary">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{ann.title}</CardTitle>
+                        <CardDescription>{format(new Date(ann.createdAt), "PPP")}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm whitespace-pre-wrap">{ann.message}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {activeSection === "notifications" && (
             <div className="space-y-6 animate-fade-in">
               <div>
