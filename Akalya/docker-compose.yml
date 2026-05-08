@@ -20,10 +20,11 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - MONGODB_URI=mongodb://db:27017/Akalya
-      - JWT_SECRET=your-secret-key-change-in-production
-      - LOVABLE_API_KEY=your-lovable-api-key
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173}
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     depends_on:
       - db
     networks:
