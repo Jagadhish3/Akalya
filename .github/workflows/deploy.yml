@@ -51,6 +51,11 @@ jobs:
           script: |
             cd ~/Akalya/Akalya
             git pull origin deploy
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}'
+            export GEMINI_MODEL='${{ secrets.GEMINI_MODEL }}'
+            export MONGODB_URI='${{ secrets.MONGODB_URI }}'
+            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
             docker-compose down
             docker-compose pull
             docker-compose up -d
