@@ -5,6 +5,13 @@ import express from 'express';
 import ChatConversation from '../models/ChatConversation.js';
 import ChatMessage from '../models/ChatMessage.js';
 import { authenticate } from '../middleware/auth.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 console.log('[chat router] loaded');
@@ -107,132 +114,168 @@ router.get('/conversations/:conversationId/messages', authenticate, async (req, 
 /* -------------------------
    Assistant (calls Gemini)
    ------------------------- */
-// Replace your existing router.post('/assistant', ...) with this block
+
+// Load Knowledge Base
+const kbPath = path.join(__dirname, '../data/knowledge_base.json');
+let knowledgeBase = { faqs: [] };
+try {
+  if (fs.existsSync(kbPath)) {
+    knowledgeBase = JSON.parse(fs.readFileSync(kbPath, 'utf8'));
+  }
+} catch (err) {
+  console.error('Failed to load knowledge base:', err);
+}
+
+// Simple semantic/keyword matcher
+const matchKnowledgeBase = (query) => {
+  const q = query.toLowerCase();
+  for (const faq of knowledgeBase.faqs) {
+    if (faq.keywords.some(k => q.includes(k.toLowerCase()))) {
+      return faq;
+    }
+  }
+  return null;
+};
+
 router.post('/assistant', authenticate, async (req, res) => {
   try {
-    const { messages } = req.body || {};
+    const { messages, conversationId } = req.body || {};
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.LOVABLE_API_KEY;
-    const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'your-lovable-api-key') {
-      console.error('GEMINI_API_KEY / LOVABLE_API_KEY not set');
-      return res.status(503).json({ error: 'AI assistant is not configured. Please set GEMINI_API_KEY or LOVABLE_API_KEY.' });
-    }
-    if (!Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Invalid payload: messages must be an array' });
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Invalid payload: messages must be a non-empty array' });
     }
 
-    // Helper to normalize/validate roles for Gemini (Gemini only accepts 'user' and 'model')
-    const normalizeRole = (role) => {
-      if (!role) return 'user';
-      const r = String(role).toLowerCase();
-      if (r === 'user') return 'user';
-      // Map assistant/system/anything else to model
-      if (r === 'assistant' || r === 'system' || r === 'model') return 'model';
-      // default fallback
-      return 'model';
-    };
+    const lastUserMessage = messages[messages.length - 1].content;
 
-    // Build contents array expected by generateContent
-    const contents = messages.map((m) => {
-      const role = normalizeRole(m.role);
-      return { role, parts: [{ text: String(m.content ?? '') }] };
-    });
-
-    // Prepend an instruction/identity as a model role (not 'system')
-    contents.unshift({
-      role: 'model',
-      parts: [{ text: 'You are Akalya Assistant, a helpful AI tutor. Be friendly and concise.' }],
-    });
-
-    // Optional: debug log the payload being sent to Gemini (trim large texts)
-    console.debug('[assistant] sending contents to Gemini:', contents.map(c => ({
-      role: c.role,
-      text: (c.parts && c.parts[0] && String(c.parts[0].text || '')).slice(0, 200)
-    })));
-
-    // Build request body
-    const modelName = GEMINI_MODEL.startsWith('models/') ? GEMINI_MODEL : `models/${GEMINI_MODEL}`;
-    const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent`;
-    const body = { contents, generationConfig: { temperature: 0.2, maxOutputTokens: 800 } };
-
-    // helper: fetch with timeout and single retry (keeps your previous logic)
-    const fetchWithTimeoutAndRetry = async (url, options, timeoutMs = 20000, retries = 1) => {
-      const attempt = async () => {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeoutMs);
+    // 1. Try local Knowledge Base first
+    const kbMatch = matchKnowledgeBase(lastUserMessage);
+    if (kbMatch) {
+      const responseText = kbMatch.answer;
+      
+      // Save to MongoDB if conversationId provided
+      if (conversationId) {
         try {
-          const resp = await fetch(url, { ...options, signal: controller.signal });
-          clearTimeout(id);
-          return resp;
-        } catch (err) {
-          clearTimeout(id);
-          throw err;
+          await new ChatMessage({ conversationId, role: 'user', content: lastUserMessage }).save();
+          await new ChatMessage({ conversationId, role: 'assistant', content: responseText }).save();
+        } catch (dbErr) {
+          console.warn('Failed to save messages to DB:', dbErr);
         }
-      };
-
-      try {
-        return await attempt();
-      } catch (err) {
-        if (retries > 0) {
-          await new Promise((r) => setTimeout(r, 500));
-          return await fetchWithTimeoutAndRetry(url, options, timeoutMs, retries - 1);
-        }
-        throw err;
       }
-    };
 
-    const options = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY
+      return res.json({ 
+        message: responseText, 
+        navigate: kbMatch.navigate,
+        source: 'knowledge_base' 
+      });
+    }
+
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'your-lovable-api-key' || GEMINI_API_KEY.includes('insert')) {
+      // 2. Fallback to Basic Rule-based matching if no AI key
+      console.warn('GEMINI_API_KEY not configured. Using Basic Mode.');
+      
+      const basicResponses = [
+        { keywords: ['help', 'what can you do', 'who are you'], reply: 'I am the Akalya Assistant. I can help you find scholarships, exams, jobs, and guide you through the website features even when my AI brain is in "Basic Mode"!' },
+        { keywords: ['contact', 'support', 'email'], reply: 'You can contact our support team through the official portal or your institution coordinator.' },
+        { keywords: ['hi', 'hello', 'hey'], reply: 'Hello! I am in Basic Mode because an AI API Key is not set, but I can still help you with website navigation!' },
+      ];
+
+      for (const br of basicResponses) {
+        if (br.keywords.some(k => lastUserMessage.toLowerCase().includes(k))) {
+          return res.json({ message: br.reply, source: 'basic_fallback' });
+        }
+      }
+
+      return res.json({ 
+        message: "I'm currently in 'Basic Mode' because a Gemini API Key is not configured in the server's .env file. Please add a valid GEMINI_API_KEY to see my full AI potential! \n\nHowever, I can still answer questions about Scholarships, Exams, and Jobs if you use those keywords.",
+        source: 'unconfigured_warning'
+      });
+    }
+
+    const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+    const systemInstruction = `
+      You are the Akalya Assistant, a specialized AI for rural Indian students.
+      
+      STRICT DOMAIN CONSTRAINTS:
+      1. ONLY answer questions about the Akalya website (Scholarships, Exams, Jobs, Practice Tests).
+      2. ONLY answer academic questions for Class 1 to 12.
+      3. REJECT any non-educational topics (movies, gossip, etc.).
+      
+      COMMUNICATION STYLE (CRITICAL):
+      - Use VERY simple, clear, and easy language.
+      - Avoid complex formulas and technical jargon unless specifically asked.
+      - Use real-life analogies that a rural student can understand.
+      - Keep your answers short and direct.
+      - For academic questions, provide a "Simple Summary" first.
+      
+      Response Format:
+      - Start with a direct, simple answer.
+      - Use bullet points for clarity.
+      - End by asking if they want to see a specific section of the website related to their question.
+    `;
+
+    const model = genAI.getGenerativeModel({ 
+      model: GEMINI_MODEL,
+      systemInstruction: systemInstruction
+    });
+
+    // Format history for SDK (must alternate user/model)
+    const history = [];
+    messages.slice(0, -1).forEach((m) => {
+      const role = m.role === 'assistant' || m.role === 'model' ? 'model' : 'user';
+      if (history.length > 0 && history[history.length - 1].role === role) {
+        history[history.length - 1].parts[0].text += '\n' + m.content;
+      } else {
+        history.push({ role, parts: [{ text: m.content }] });
+      }
+    });
+
+    // SDK requirement: if first message is model, we should remove it or prepend a dummy user
+    if (history.length > 0 && history[0].role === 'model') {
+      history.shift();
+    }
+
+    const chatSession = model.startChat({
+      history: history,
+      generationConfig: {
+        maxOutputTokens: 800,
+        temperature: 0.2,
       },
-      body: JSON.stringify(body),
-    };
+    });
 
-    let apiResp;
-    try {
-      apiResp = await fetchWithTimeoutAndRetry(url, options, 20000, 1);
-    } catch (err) {
-      console.error('[chat assistant] network/gateway error calling Gemini:', err);
-      return res.status(502).json({ error: 'Model is under training, we will let you know after integration' });
+    const result = await chatSession.sendMessage(lastUserMessage);
+    const response = await result.response;
+    const finalTextRaw = response.text();
+
+    let finalText = finalTextRaw;
+    let navigatePath = null;
+    const navMatch = finalText.match(/\[NAVIGATE:\s*([^\]]+)\]/);
+    if (navMatch) {
+      navigatePath = navMatch[1].trim();
+      finalText = finalText.replace(/\[NAVIGATE:\s*[^\]]+\]/, '').trim();
     }
 
-    const providerText = await apiResp.text().catch(() => '');
-
-    if (!apiResp.ok) {
-      // Log provider response (server logs only)
-      console.error('[Gemini] non-OK', apiResp.status, providerText.slice(0, 4000));
-      // Return a sanitized error to client (avoid leaking providerBody)
-      return res.status(502).json({ error: 'AI gateway error', providerStatus: apiResp.status, providerBody: providerText });
+    // Save to MongoDB
+    if (conversationId) {
+      try {
+        await new ChatMessage({ conversationId, role: 'user', content: lastUserMessage }).save();
+        await new ChatMessage({ conversationId, role: 'assistant', content: finalText }).save();
+      } catch (dbErr) {
+        console.warn('Failed to save messages to DB:', dbErr);
+      }
     }
 
-    // parse provider JSON (best-effort)
-    let providerJson;
-    try {
-      providerJson = JSON.parse(providerText || '{}');
-    } catch (err) {
-      providerJson = providerText;
-    }
+    return res.json({ message: finalText, navigate: navigatePath });
 
-    // Extract assistant text from common shapes
-    const assistantText =
-      providerJson?.candidates?.[0]?.content?.parts?.[0]?.text ??
-      providerJson?.output?.[0]?.content?.[0]?.text ??
-      (typeof providerJson === 'string' ? providerJson : JSON.stringify(providerJson));
-
-    const finalText = assistantText && String(assistantText).trim()
-      ? String(assistantText)
-      : "Sorry — the AI returned no usable response. Please try again later.";
-
-    // Return normalized response (message + raw for logs or client debugging)
-    return res.json({ message: finalText, raw: providerJson });
   } catch (error) {
-    console.error('Chat assistant error:', error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    console.error('Chat assistant SDK error:', error);
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'AI error occurred' });
   }
 });
+;
 
 // DEV ONLY — preview how server will format contents for Gemini
 // Add this block to server/routes/chat.js (then deploy/restart server)

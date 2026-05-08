@@ -95,9 +95,9 @@ export const useAuth = () => {
   };
 
 // inside useAuth.tsx (replace signIn)
-const signIn = async (email: string, password: string) => {
+const signIn = async (email: string, password: string, role?: string) => {
   try {
-    const data = await authAPI.signIn(email, password);
+    const data = await authAPI.signIn(email, password, role);
 
     // Prefer the user returned by signin response (server already provided it)
     if (data?.user) {

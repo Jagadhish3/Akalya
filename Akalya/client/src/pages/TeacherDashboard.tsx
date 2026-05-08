@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
-import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI, announcementsAPI, resourcesAPI } from "@/lib/api";
+import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI, announcementsAPI, resourcesAPI, notificationsAPI } from "@/lib/api";
 import { CreateCourseDialog } from "@/components/CreateCourseDialog";
 import { EditCourseDialog } from "@/components/EditCourseDialog";
+import { CourseLecturesDialog } from "@/components/CourseLecturesDialog";
 import { UploadResourceDialog } from "@/components/UploadResourceDialog";
 import { CourseCard } from "@/components/CourseCard";
 import { CreateAssignmentDialog } from "@/components/CreateAssignmentDialog";
@@ -66,10 +67,12 @@ export default function TeacherDashboard() {
   const [queries, setQueries] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [libraryResources, setLibraryResources] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Manage course UI state
   const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [viewingCourseId, setViewingCourseId] = useState<string | null>(null);
 
   // derived enrollment counts
   const [courseStudentCounts, setCourseStudentCounts] = useState<Record<string, number>>({});
@@ -141,13 +144,14 @@ export default function TeacherDashboard() {
   const fetchDashboardRealtime = async () => {
     if (!user) return;
     try {
+      const teacherId = user?.id || (user as any)?._id;
       const [coursesRes, assignmentsRes, submissionsRes, classesRes, enrollmentsRes, queriesRes, notifRes] = await Promise.allSettled([
-        coursesAPI.getAll(),
-        assignmentsAPI.getAll(),
-        submissionsAPI.getAll(),
-        classesAPI.getAll({ hasVideo: true }),
-        enrollmentsAPI.getAll(),
-        queriesAPI.getAll(),
+        coursesAPI.getAll({ teacherId }),
+        assignmentsAPI.getAll({ teacherId }),
+        submissionsAPI.getAll({ teacherId }),
+        classesAPI.getAll({ hasVideo: true, teacherId }),
+        enrollmentsAPI.getAll({ teacherId }),
+        queriesAPI.getAll({ teacherId }),
         notificationsAPI.getMine(),
       ]);
 
@@ -175,7 +179,8 @@ export default function TeacherDashboard() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const data = await coursesAPI.getAll();
+      const teacherId = user?.id || (user as any)?._id;
+      const data = await coursesAPI.getAll({ teacherId });
       setCourses(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to fetch courses", variant: "destructive" });
@@ -189,8 +194,9 @@ export default function TeacherDashboard() {
     if (!user) return;
     try {
       setLoading(true);
-      const assignmentsData = await assignmentsAPI.getAll();
-      const submissionsData = await submissionsAPI.getAll();
+      const teacherId = user?.id || (user as any)?._id;
+      const assignmentsData = await assignmentsAPI.getAll({ teacherId });
+      const submissionsData = await submissionsAPI.getAll({ teacherId });
       setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
     } catch (error: any) {
@@ -224,7 +230,8 @@ export default function TeacherDashboard() {
 
   const fetchLibraryResources = async () => {
     try {
-      const data = await resourcesAPI.getAll();
+      const teacherId = user?.id || (user as any)?._id;
+      const data = await resourcesAPI.getAll({ teacherId });
       const all = Array.isArray(data) ? data : [];
       // filter for teacher or all
       setLibraryResources(all.filter((r: any) => r.targetRole === "all" || r.targetRole === "teacher"));
@@ -238,7 +245,8 @@ export default function TeacherDashboard() {
     if (!user) return;
     try {
       setLoading(true);
-      const classesData = await classesAPI.getAll({ hasVideo: true });
+      const teacherId = user.id || (user as any)._id;
+      const classesData = await classesAPI.getAll({ hasVideo: true, teacherId });
       setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to fetch uploaded videos", variant: "destructive" });
@@ -251,7 +259,8 @@ export default function TeacherDashboard() {
   // NEW: fetch enrollments and compute counts
   const fetchEnrollments = async () => {
     try {
-      const data = await enrollmentsAPI.getAll();
+      const teacherId = user?.id || (user as any)?._id;
+      const data = await enrollmentsAPI.getAll({ teacherId });
       const list = Array.isArray(data) ? data : [];
       setEnrollments(list);
     } catch (err: any) {
@@ -413,16 +422,15 @@ export default function TeacherDashboard() {
 
   const menuItems = [
     { id: "dashboard", label: t('nav.dashboard'), icon: Home },
-    { id: "announcements", label: t('nav.announcements'), icon: Megaphone },
-    { id: "courses", label: t('courses.manage'), icon: BookOpen },
+    { id: "courses", label: t('nav.courses'), icon: BookOpen },
     { id: "create", label: t('courses.create'), icon: Plus },
     { id: "assignments", label: t('nav.assignments'), icon: FileText },
-    { id: "attendance", label: t('student.attendance'), icon: Calendar },
-    { id: "queries", label: t('nav.queries'), icon: MessageSquare },
-    { id: "analytics", label: t('nav.analytics'), icon: TrendingUp },
+    { id: "attendance", label: t('teacher.attendanceManagement'), icon: Calendar },
+    { id: "queries", label: t('teacher.studentQueries'), icon: MessageSquare },
+    { id: "analytics", label: t('teacher.teachingAnalytics'), icon: TrendingUp },
     { id: "resources", label: t('teacher.resources'), icon: Upload },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "settings", label: t('nav.settings') || "Settings", icon: Settings },
+    { id: "announcements", label: t('nav.announcements'), icon: Megaphone },
+    { id: "settings", label: t('nav.settings'), icon: Settings },
   ];
 
   // Helper to resolve a readable student label
@@ -548,7 +556,7 @@ export default function TeacherDashboard() {
         <header className="bg-card border-b p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Teacher Management Dashboard</h1>
+              <h1 className="text-3xl font-bold">{t('teacher.dashboard')}</h1>
               <p className="text-muted-foreground">{t('teacher.welcomeBack')}, {user?.fullName}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -777,12 +785,13 @@ export default function TeacherDashboard() {
                           title: course.title,
                           description: course.description,
                           status: course.status,
+                          teacherName: user?.fullName || "Teacher",
                           url: course.url ?? course.courseUrl ?? null,
                         }}
                         canDelete={true}
                         onDelete={(id) => handleDeleteCourse(id)}
                         onManage={() => setEditingCourse(course)}
-                        onViewCourse={() => toast({ title: "Course view", description: "Navigating to course content..." })}
+                        onViewCourse={(id) => setViewingCourseId(id)}
                       />
                     );
                   })}
@@ -791,12 +800,21 @@ export default function TeacherDashboard() {
             </div>
           )}
 
+          {viewingCourseId && (
+            <CourseLecturesDialog
+              courseId={viewingCourseId}
+              onClose={() => setViewingCourseId(null)}
+              onProgressUpdated={fetchCourses}
+              isTeacherView={true}
+            />
+          )}
+
           {/* CREATE */}
           {activeSection === "create" && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Create New Course</h2>
-                <p className="text-muted-foreground">Add a new course to your teaching portfolio</p>
+                <h2 className="text-2xl font-bold mb-2">{t('courses.create')}</h2>
+                <p className="text-muted-foreground">{t('course.addCourse')}</p>
               </div>
               <Card>
                 <CardContent className="py-12 text-center">

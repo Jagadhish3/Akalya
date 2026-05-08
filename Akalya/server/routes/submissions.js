@@ -28,6 +28,11 @@ router.get('/', authenticate, async (req, res) => {
       query = {
         $or: [{ student_id: studentId }, { studentId: studentId }, { student: studentId }],
       };
+    } else if (req.query.teacherId) {
+      // Teachers only see submissions for THEIR assignments
+      const teacherAssignments = await Assignment.find({ teacherId: req.query.teacherId }).select('_id');
+      const assignmentIds = teacherAssignments.map(a => a._id);
+      query = { assignmentId: { $in: assignmentIds } };
     }
 
     // try to populate 'assignment' only if it is referenced in schema

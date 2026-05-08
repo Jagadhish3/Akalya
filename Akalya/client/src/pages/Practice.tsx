@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { BookOpen, Clock, CheckCircle, Award, History } from "lucide-react";
 import { Badge as UIBadge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const CLASSES = [6, 7, 8, 9, 10, 11, 12];
 const SUBJECTS = ["Mathematics", "Science", "Social Studies", "English", "Physics", "Chemistry", "Biology"];
@@ -43,6 +44,7 @@ const GENERIC_QUESTIONS = [
 export default function Practice({ embedded }: { embedded?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [classLevel, setClassLevel] = useState<number>(10);
   const [subject, setSubject] = useState<string>("Mathematics");
   const [questions, setQuestions] = useState<any[]>([]);
@@ -145,30 +147,30 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
 
   const content = (
     <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">Practice (Class 6–12)</h1>
-        <p className="text-muted-foreground mb-6">MCQ-based practice with timer and auto evaluation. Earn badges based on your score!</p>
+        <h1 className="text-3xl font-bold mb-2">{t('practice.title')}</h1>
+        <p className="text-muted-foreground mb-6">{t('practice.description')}</p>
 
         {!started && !submitted && (
           <Card className="mb-6 border-primary/20 shadow-sm">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /> Select Practice Topic</CardTitle>
+              <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /> {t('practice.selectTopic')}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2">
-                <Label>Class Level</Label>
+                <Label>{t('practice.classLevel')}</Label>
                 <Select value={String(classLevel)} onValueChange={(v) => setClassLevel(parseInt(v, 10))}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {CLASSES.map((c) => (
-                      <SelectItem key={c} value={String(c)}>Class {c}</SelectItem>
+                      <SelectItem key={c} value={String(c)}>{t('practice.class')} {c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Subject</Label>
+                <Label>{t('practice.subject')}</Label>
                 <Select value={subject} onValueChange={setSubject}>
                   <SelectTrigger className="w-44">
                     <SelectValue />
@@ -181,7 +183,7 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
                 </Select>
               </div>
               <Button onClick={startPractice} disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Loading..." : "Start Practice"}
+                {loading ? t('common.loading') : t('practice.start')}
               </Button>
             </CardContent>
           </Card>
@@ -192,7 +194,7 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
             <CardHeader className="bg-muted/30 pb-4 border-b">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">Class {classLevel} - {subject}</CardTitle>
+                  <CardTitle className="text-lg">{t('practice.class')} {classLevel} - {subject}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">Answer all {questions.length} questions</p>
                 </div>
                 <div className="flex items-center gap-2 text-primary font-mono bg-primary/10 px-3 py-1.5 rounded-md">
@@ -224,7 +226,7 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
                 ))}
               </div>
               <div className="mt-8 flex justify-end">
-                <Button size="lg" onClick={handleSubmit}>Submit Answers</Button>
+                <Button size="lg" onClick={handleSubmit}>{t('practice.submitting')}</Button>
               </div>
             </CardContent>
           </Card>
@@ -235,27 +237,27 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
             <CardHeader className="bg-green-500/5 pb-4 border-b border-green-500/20">
               <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
                 <CheckCircle className="h-6 w-6" />
-                Practice Completed!
+                {t('practice.completed')}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="grid md:grid-cols-2 gap-6 items-center">
                 <div className="space-y-4">
                   <div>
-                    <p className="text-muted-foreground text-sm">Your Score</p>
+                    <p className="text-muted-foreground text-sm">{t('practice.yourScore')}</p>
                     <p className="text-4xl font-bold text-foreground mt-1">
                       {submitted.correctCount} <span className="text-2xl text-muted-foreground font-normal">/ {submitted.total}</span>
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-sm">Time Taken</p>
+                    <p className="text-muted-foreground text-sm">{t('practice.timeTaken')}</p>
                     <p className="text-lg font-medium">{Math.floor((submitted.timeSpentSeconds) / 60)}m {(submitted.timeSpentSeconds % 60)}s</p>
                   </div>
                 </div>
                 
                 <div className="flex flex-col items-center justify-center p-6 bg-muted/30 rounded-xl border">
                   <Award className="h-12 w-12 text-primary mb-3" />
-                  <p className="text-sm text-muted-foreground mb-2">Achievement Unlocked</p>
+                  <p className="text-sm text-muted-foreground mb-2">{t('practice.achievement')}</p>
                   <UIBadge className={`px-4 py-1.5 text-sm ${submitted.badgeColor}`}>
                     {submitted.badgeText}
                   </UIBadge>
@@ -263,7 +265,7 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
               </div>
               
               <div className="mt-8 flex gap-3">
-                <Button onClick={() => { setSubmitted(null); setStarted(false); }}>Try another test</Button>
+                <Button onClick={() => { setSubmitted(null); setStarted(false); }}>{t('practice.tryAnother')}</Button>
               </div>
             </CardContent>
           </Card>
@@ -274,7 +276,7 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
             <CardHeader className="pb-3 border-b mb-4">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <History className="h-5 w-5 text-muted-foreground" />
-                Your Practice History
+                {t('practice.history')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -282,8 +284,8 @@ export default function Practice({ embedded }: { embedded?: boolean }) {
                 {history.slice(0, 5).map((h) => (
                   <div key={h._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-muted/20 rounded-md border text-sm">
                     <div className="space-y-1">
-                      <p className="font-medium">Class {h.classLevel} – {h.subject}</p>
-                      <p className="text-muted-foreground text-xs">Score: {h.correctCount}/{h.total} • Time: {Math.floor(h.timeSpentSeconds / 60)}m {h.timeSpentSeconds % 60}s</p>
+                      <p className="font-medium">{t('practice.class')} {h.classLevel} – {h.subject}</p>
+                      <p className="text-muted-foreground text-xs">{t('practice.score')}: {h.correctCount}/{h.total} • {t('practice.time')}: {Math.floor(h.timeSpentSeconds / 60)}m {h.timeSpentSeconds % 60}s</p>
                     </div>
                     <div className="mt-2 sm:mt-0">
                       <UIBadge className={`${h.badgeColor} text-xs`}>{h.badgeText}</UIBadge>

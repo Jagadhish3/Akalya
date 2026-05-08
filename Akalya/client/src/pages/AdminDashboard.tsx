@@ -269,16 +269,16 @@ export default function AdminDashboard() {
   };
 
   const menuItems = [
-    { id: "dashboard", label: "Admin Dashboard", icon: Home },
-    { id: "users", label: "Manage Users", icon: Users },
-    { id: "courses", label: "Manage Courses", icon: BookOpen },
-    { id: "assignments", label: "Assignments", icon: FileText },
-    { id: "attendance", label: "Attendance Reports", icon: Calendar },
+    { id: "dashboard", label: t('admin.dashboard'), icon: Home },
+    { id: "users", label: t('admin.platformSettings'), icon: Users },
+    { id: "courses", label: t('courses.manage'), icon: BookOpen },
+    { id: "assignments", label: t('nav.assignments'), icon: FileText },
+    { id: "attendance", label: t('admin.attendanceReports'), icon: Calendar },
     { id: "forum", label: "Forum Oversight", icon: MessageSquare },
-    { id: "analytics", label: "Platform Analytics", icon: TrendingUp },
-    { id: "resources", label: "Resources", icon: Upload },
-    { id: "announcements", label: "Announcements", icon: Bell },
-    { id: "settings", label: "Platform Settings", icon: Settings },
+    { id: "analytics", label: t('admin.platformAnalytics'), icon: TrendingUp },
+    { id: "resources", label: t('admin.platformResources'), icon: Upload },
+    { id: "announcements", label: t('nav.announcements'), icon: Bell },
+    { id: "settings", label: t('nav.settings'), icon: Settings },
   ];
 
   return (
@@ -318,7 +318,7 @@ export default function AdminDashboard() {
             onClick={handleSignOut}
           >
             <LogOut className="h-5 w-5" />
-            {sidebarOpen && <span>Logout</span>}
+            {sidebarOpen && <span>{t('teacher.logout')}</span>}
           </Button>
         </div>
       </aside>
@@ -328,7 +328,7 @@ export default function AdminDashboard() {
         <header className="bg-card border-b p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+              <h1 className="text-3xl font-bold">{t('admin.dashboard')}</h1>
               <p className="text-muted-foreground">System Overview & Management</p>
             </div>
             <div className="flex items-center gap-3">
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="hover-scale">
                   <CardHeader className="pb-3">
-                    <CardDescription>Total Users</CardDescription>
+                    <CardDescription>{t('teacher.totalStudents')}</CardDescription>
                     <CardTitle className="text-4xl">{stats.totalUsers}</CardTitle>
                   </CardHeader>
                   <CardContent>

@@ -6,6 +6,18 @@ export const getAll = async (req, res) => {
     const filter = { isActive: true };
     if (req.query.type) filter.type = req.query.type;
     if (req.query.classLevel) filter.classLevel = req.query.classLevel;
+    
+    if (req.query.teacherId) {
+      // Teachers see:
+      // 1. Resources they created
+      // 2. Global resources (no creator or created by admin - usually null createdBy)
+      filter.$or = [
+        { createdBy: req.query.teacherId },
+        { createdBy: null },
+        { createdBy: { $exists: false } }
+      ];
+    }
+
     const list = await PreparationResource.find(filter).sort({ type: 1, title: 1 });
     return res.json(list);
   } catch (err) {

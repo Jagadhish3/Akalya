@@ -19,6 +19,12 @@ const courseSchema = new mongoose.Schema({
     maxlength: 2000,
     default: null,
   },
+  thumbnailUrl: {
+    type: String,
+    trim: true,
+    maxlength: 2000,
+    default: null,
+  },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

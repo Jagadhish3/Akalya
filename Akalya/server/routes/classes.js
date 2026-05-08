@@ -5,12 +5,20 @@ import ClassModel from '../models/Class.js'; // make sure server/models/Class.js
 const router = express.Router();
 
 // Helper: build a base filter from query params
-function buildFilterFromReqQuery(q) {
+async function buildFilterFromReqQuery(q) {
   const filter = {};
 
   if (q.courseId) {
     filter.course = q.courseId;
   }
+  
+  if (q.teacherId) {
+    const Course = (await import('../models/Course.js')).default;
+    const teacherCourses = await Course.find({ teacherId: q.teacherId }).select('_id');
+    const courseIds = teacherCourses.map(c => c._id);
+    filter.course = { $in: courseIds };
+  }
+
   if (q.status) {
     filter.status = q.status;
   }
@@ -38,7 +46,7 @@ function buildFilterFromReqQuery(q) {
 // GET /api/classes
 router.get('/', async (req, res) => {
   try {
-    const filter = buildFilterFromReqQuery(req.query);
+    const filter = await buildFilterFromReqQuery(req.query);
     const classes = await ClassModel.find(filter).populate('course', 'title description').sort({ createdAt: -1 }).lean();
     res.json(classes);
   } catch (err) {

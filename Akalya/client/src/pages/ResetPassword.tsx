@@ -9,13 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { authAPI } from "@/lib/api";
 
 const validatePassword = (password: string) => {
-  const minLength = 10;
+  const minLength = 6;
   const hasCapital = /[A-Z]/.test(password);
   const hasSmall = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
-  if (password.length < minLength) return "Password must be at least 10 characters long.";
+  if (password.length < minLength) return "Password must be at least 6 characters long.";
   if (!hasCapital) return "Password must contain at least one capital letter.";
   if (!hasSmall) return "Password must contain at least one lowercase letter.";
   if (!hasNumber) return "Password must contain at least one digit.";
@@ -122,7 +122,7 @@ const ResetPassword = () => {
               <div className="bg-muted/50 p-2 rounded-md text-[10px] space-y-1 text-muted-foreground border border-border/50">
                 <p className="font-semibold flex items-center gap-1"><InfoIcon className="h-3 w-3" /> Password Requirements:</p>
                 <ul className="grid grid-cols-2 gap-x-2 list-disc list-inside">
-                  <li>Min 10 chars</li>
+                  <li>Min 6 chars</li>
                   <li>One Capital</li>
                   <li>One Small</li>
                   <li>One Digit</li>

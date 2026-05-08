@@ -1,8 +1,12 @@
 // server/index.js
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import authRoutes from './routes/auth.js';
 import courseRouter from './routes/courses.js';
@@ -26,7 +30,6 @@ import notificationsRouter from './routes/notifications.js';
 import forumRouter from './routes/forum.js';
 import announcementsRouter from './routes/announcements.js';
 
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -75,6 +78,9 @@ app.use((req, res, next) => {
    EXPRESS JSON BODY PARSER
    --------------------------------------------------- */
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 /* ---------------------------------------------------
    SECONDARY CORS HANDLER (SAFE)

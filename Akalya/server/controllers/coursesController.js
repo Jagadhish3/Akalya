@@ -42,7 +42,7 @@ export const getCourseById = async (req, res) => {
  */
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, status, url } = req.body;
+    const { title, description, status, url, thumbnailUrl } = req.body;
 
     if (!title || typeof title !== "string" || title.trim().length === 0) {
       return res.status(400).json({ error: "Title is required" });
@@ -61,6 +61,7 @@ export const createCourse = async (req, res) => {
       // Frontend defaults to "published", but backend also ensures a safe default.
       status: status === "draft" ? "draft" : "published",
       url: url && url !== "" ? String(url).trim() : null,
+      thumbnailUrl: thumbnailUrl && thumbnailUrl !== "" ? String(thumbnailUrl).trim() : null,
       teacherId,
     });
 
@@ -79,7 +80,7 @@ export const createCourse = async (req, res) => {
  */
 export const updateCourse = async (req, res) => {
   try {
-    const { title, description, status, url } = req.body;
+    const { title, description, status, url, thumbnailUrl } = req.body;
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ error: "Course not found" });
 
@@ -96,6 +97,12 @@ export const updateCourse = async (req, res) => {
       course.url = null;
     } else if (url !== undefined) {
       course.url = String(url).trim();
+    }
+
+    if (thumbnailUrl === null || (typeof thumbnailUrl === "string" && thumbnailUrl.trim() === "")) {
+      course.thumbnailUrl = null;
+    } else if (thumbnailUrl !== undefined) {
+      course.thumbnailUrl = String(thumbnailUrl).trim();
     }
 
     await course.save();

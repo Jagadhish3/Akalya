@@ -1,5 +1,6 @@
 // server/controllers/submissionsController.js
 import Submission from "../models/Submission.js";
+import Assignment from "../models/Assignment.js";
 
 /**
  * Create a student's submission for an assignment.
@@ -48,6 +49,12 @@ export const getSubmissions = async (req, res) => {
     const filter = {};
     if (req.query.assignmentId) filter.assignmentId = req.query.assignmentId;
     if (req.query.studentId) filter.studentId = req.query.studentId;
+
+    if (req.query.teacherId) {
+      const assignments = await Assignment.find({ teacherId: req.query.teacherId }).select("_id");
+      const assignmentIds = assignments.map((a) => a._id);
+      filter.assignmentId = { $in: assignmentIds };
+    }
 
     const submissions = await Submission.find(filter)
       .sort({ submittedAt: -1 })

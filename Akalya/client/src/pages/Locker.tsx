@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { lockerAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { FolderOpen, Upload, Download, Trash2, Edit2 } from "lucide-react";
+import { FolderOpen, Upload, Download, Trash2, Edit2, Eye } from "lucide-react";
 import { format } from "date-fns";
 
-const MAX_MB = 100;
+const MAX_MB = 500;
 
 export default function Locker({ embedded }: { embedded?: boolean }) {
   const { user } = useAuth();
@@ -76,12 +76,20 @@ export default function Locker({ embedded }: { embedded?: boolean }) {
     }
   };
 
+  const handleView = async (f: any) => {
+    try {
+      await lockerAPI.view(f.id || f._id);
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "View failed" });
+    }
+  };
+
   if (!user) {
     const msg = (
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Please log in as a student to access your digital locker. Upload certificates and documents (max 100MB total).
+            Please log in as a student to access your digital locker. Upload certificates and documents (max 500MB total).
           </CardContent>
         </Card>
       </div>
@@ -97,7 +105,7 @@ export default function Locker({ embedded }: { embedded?: boolean }) {
     <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">My Locker</h1>
         <p className="text-muted-foreground mb-6">
-          Store your certificates and documents securely. Upload, rename, download or delete. Storage limit: {limitMB} MB per user.
+          Store your certificates and documents securely. Upload (PDF files only, max 100MB per file), rename, download or delete. Total storage limit: {limitMB} MB per user.
         </p>
         <Card className="mb-6">
           <CardHeader className="pb-2">
@@ -106,9 +114,9 @@ export default function Locker({ embedded }: { embedded?: boolean }) {
           </CardHeader>
           <CardContent>
             <label className="inline-block">
-              <input id="locker-upload" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={onFileSelect} disabled={uploading} />
+              <input id="locker-upload" type="file" className="hidden" accept=".pdf" onChange={onFileSelect} disabled={uploading} />
               <Button type="button" variant="outline" className="gap-2" disabled={uploading} onClick={() => document.getElementById("locker-upload")?.click()}>
-                <Upload className="h-4 w-4" /> {uploading ? "Uploading..." : "Upload file"}
+                <Upload className="h-4 w-4" /> {uploading ? "Uploading..." : "Upload PDF (Max 100MB)"}
               </Button>
             </label>
           </CardContent>
@@ -147,6 +155,9 @@ export default function Locker({ embedded }: { embedded?: boolean }) {
                     <div className="flex gap-2 shrink-0">
                       {editingId !== (f.id || f._id) && (
                         <>
+                          <Button size="icon" variant="ghost" onClick={() => handleView(f)} title="View Document">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button size="icon" variant="ghost" onClick={() => { setEditingId(f.id || f._id); setEditName(f.displayName || f.originalName || ""); }}>
                             <Edit2 className="h-4 w-4" />
                           </Button>

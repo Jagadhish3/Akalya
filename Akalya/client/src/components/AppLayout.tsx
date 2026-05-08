@@ -20,26 +20,29 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useMemo, useState } from "react";
+import { FloatingChatbot } from "./FloatingChatbot";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, getUserRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navLinks = useMemo(() => {
     const studentBase = "/dashboard/student/career-gateway";
     const isStudent = user?.role === "student";
     return [
-      { to: "/", label: "Home", icon: Home },
-      { to: isStudent ? `${studentBase}/scholarships` : "/auth", label: "Scholarships", icon: Award },
-      { to: isStudent ? `${studentBase}/entrance-exams` : "/auth", label: "Entrance Exams", icon: FileQuestion },
-      { to: isStudent ? `${studentBase}/jobs-after-12th` : "/auth", label: "Jobs", icon: Briefcase },
-      { to: isStudent ? `${studentBase}/career-roadmap` : "/auth", label: "Career Roadmap", icon: Map },
-      { to: isStudent ? `${studentBase}/practice` : "/auth", label: "Practice", icon: BookOpen },
-      { to: isStudent ? `${studentBase}/test-series` : "/auth", label: "Test Series", icon: ClipboardList },
-      { to: isStudent ? `${studentBase}/locker` : "/auth", label: "My Locker", icon: FolderOpen },
-      { to: "/about", label: "About", icon: Info },
+      { to: "/", label: t('nav.home'), icon: Home },
+      { to: isStudent ? `${studentBase}/scholarships` : "/auth", label: t('nav.scholarships'), icon: Award },
+      { to: isStudent ? `${studentBase}/entrance-exams` : "/auth", label: t('nav.entranceExams'), icon: FileQuestion },
+      { to: isStudent ? `${studentBase}/jobs-after-12th` : "/auth", label: t('nav.jobs'), icon: Briefcase },
+      { to: isStudent ? `${studentBase}/career-roadmap` : "/auth", label: t('nav.roadmap'), icon: Map },
+      { to: isStudent ? `${studentBase}/practice` : "/auth", label: t('nav.practice'), icon: BookOpen },
+      { to: isStudent ? `${studentBase}/test-series` : "/auth", label: t('nav.testSeries'), icon: ClipboardList },
+      { to: isStudent ? `${studentBase}/locker` : "/auth", label: t('nav.locker'), icon: FolderOpen },
+      { to: "/about", label: t('nav.about'), icon: Info },
     ];
   }, [user?.role]);
 
@@ -85,7 +88,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               {user ? (
                 <>
                   <Button size="sm" onClick={handleDashboard}>
-                    Dashboard
+                    {t('nav.dashboard')}
                   </Button>
                   <Button variant="ghost" size="icon" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4" />
@@ -95,7 +98,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link to="/auth">
                   <Button size="sm" className="gap-1.5">
                     <LogIn className="h-4 w-4" />
-                    Login
+                    {t('nav.login')}
                   </Button>
                 </Link>
               )}
@@ -124,6 +127,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </nav>
       <main>{children}</main>
+      {user?.role === "student" && <FloatingChatbot />}
     </div>
   );
 }

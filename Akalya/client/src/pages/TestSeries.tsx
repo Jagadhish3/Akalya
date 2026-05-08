@@ -16,9 +16,22 @@ export default function TestSeries({ embedded }: { embedded?: boolean }) {
 
   useEffect(() => {
     let mounted = true;
-    mockTestsAPI.getAll().then((data) => setTests(Array.isArray(data) ? data : [])).catch(() => {});
+    mockTestsAPI.getAll().then((data) => {
+      if (mounted) {
+        if (Array.isArray(data) && data.length > 0) {
+          setTests(data);
+        } else {
+          setTests(STATIC_MOCK_TESTS);
+        }
+      }
+    }).catch(() => {
+      if (mounted) setTests(STATIC_MOCK_TESTS);
+    });
+
     if (user) {
-      mockTestsAPI.getMyAttempts().then((data) => setAttempts(Array.isArray(data) ? data : [])).catch(() => {});
+      mockTestsAPI.getMyAttempts().then((data) => {
+        if (mounted) setAttempts(Array.isArray(data) ? data : []);
+      }).catch(() => {});
     }
     setLoading(false);
     return () => { mounted = false; };

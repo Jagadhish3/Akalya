@@ -25,7 +25,18 @@ export default function TestSeriesAttempt() {
 
   useEffect(() => {
     if (!id || !user) return;
-    mockTestsAPI.getById(id).then(setTest).catch(() => setTest(null));
+    mockTestsAPI.getById(id).then((data) => {
+      if (data) setTest(data);
+      else {
+        // Fallback
+        const staticTest = STATIC_MOCK_TESTS.find(t => t.id === id);
+        setTest(staticTest || null);
+      }
+    }).catch(() => {
+      // Fallback on error
+      const staticTest = STATIC_MOCK_TESTS.find(t => t.id === id);
+      setTest(staticTest || null);
+    });
   }, [id, user]);
 
   useEffect(() => {
@@ -45,6 +56,7 @@ export default function TestSeriesAttempt() {
       questionId: q.id || q._id,
       selectedIndex: answers[q.id || q._id] ?? -1,
     }));
+
     try {
       const result = await mockTestsAPI.submit({
         mockTestId: test._id || test.id,
@@ -53,7 +65,37 @@ export default function TestSeriesAttempt() {
       });
       setSubmitted(result);
     } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Submit failed" });
+      console.warn("API submission failed, performing local grading", e);
+      
+      // Local Grading Fallback
+      let score = 0;
+      let totalMarks = 0;
+      const weakTopicsSet = new Set<string>();
+
+      (test.questions || []).forEach((q: any) => {
+        const userAns = answers[q.id || q._id];
+        const isCorrect = userAns === q.correctIndex;
+        const marks = Number(q.marks || 0);
+        totalMarks += marks;
+        if (isCorrect) {
+          score += marks;
+        } else if (q.subject) {
+          weakTopicsSet.add(q.subject);
+        }
+      });
+
+      setSubmitted({
+        score,
+        totalMarks,
+        weakTopics: Array.from(weakTopicsSet),
+        improvementSuggestions: "Keep practicing! You are doing great.",
+        isLocal: true
+      });
+
+      toast({ 
+        title: "Test Completed (Local Mode)", 
+        description: "Your score was calculated locally because the server is unreachable." 
+      });
     }
   };
 

@@ -16,13 +16,13 @@ import { authAPI } from "@/lib/api";
 const emailSchema = z.string().email("Invalid email address");
 
 const validatePassword = (password: string) => {
-  const minLength = 10;
+  const minLength = 6;
   const hasCapital = /[A-Z]/.test(password);
   const hasSmall = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
-  if (password.length < minLength) return "Password must be at least 10 characters long.";
+  if (password.length < minLength) return "Password must be at least 6 characters long.";
   if (!hasCapital) return "Password must contain at least one capital letter.";
   if (!hasSmall) return "Password must contain at least one lowercase letter.";
   if (!hasNumber) return "Password must contain at least one digit.";
@@ -93,7 +93,7 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
 
-      const result = await signIn(email, password);
+      const result = await signIn(email, password, role);
       if (!result.error) {
         await new Promise(resolve => setTimeout(resolve, 200));
         const userRole = (result as any).user?.role ?? (await getUserRole());
@@ -438,24 +438,54 @@ const Auth = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
-                    <Input 
-                      id="signup-password"
-                      name="password"
-                      type="password" 
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="relative">
+                      <Input 
+                        id="signup-password"
+                        name="password"
+                        type={showPassword ? "text" : "password"} 
+                        placeholder="••••••••"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <div className="bg-muted/50 p-2 rounded-md text-[10px] space-y-1 text-muted-foreground border border-border/50">
+                      <p className="font-semibold flex items-center gap-1"><InfoIcon className="h-3 w-3" /> Password Requirements:</p>
+                      <ul className="grid grid-cols-2 gap-x-2 list-disc list-inside">
+                        <li>Min 6 chars</li>
+                        <li>One Capital</li>
+                        <li>One Small</li>
+                        <li>One Digit</li>
+                        <li>One Special</li>
+                      </ul>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <Input 
-                      id="signup-confirm"
-                      name="confirm-password"
-                      type="password" 
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="relative">
+                      <Input 
+                        id="signup-confirm"
+                        name="confirm-password"
+                        type={showConfirmPassword ? "text" : "password"} 
+                        placeholder="••••••••"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

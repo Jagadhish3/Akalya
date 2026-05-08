@@ -29,7 +29,8 @@ router.post('/', authenticate, async (req, res) => {
       student: studentId,         // your schema requires this field
       studentId,                  // keep backwards-compatible field
       student_id: studentId,      // another common variant – safe to include
-      courseId: courseId ?? null,
+      course: courseId ?? null,   // Map courseId to 'course' field in schema
+      courseId: courseId ?? null, // keep backwards-compatible field
       courseTitle: courseTitle ?? null,
       subject: subject ?? null,
       message: message.trim(),
@@ -65,7 +66,14 @@ router.get('/', authenticate, async (req, res) => {
     const limit = Math.min(100, parseInt(req.query.limit) || 25);
     const skip = (page - 1) * limit;
 
-    const filter = isTeacherOrAdmin ? {} : { studentId: String(user._id ?? user.id ?? user.userId) };
+    let filter = isTeacherOrAdmin ? {} : { studentId: String(user._id ?? user.id ?? user.userId) };
+
+    if (req.query.teacherId) {
+      // Teachers only see queries for THEIR courses
+      const teacherCourses = await (await import('../models/Course.js')).default.find({ teacherId: req.query.teacherId }).select('_id');
+      const courseIds = teacherCourses.map(c => c._id);
+      filter = { course: { $in: courseIds } };
+    }
 
     const [items, total] = await Promise.all([
       Query.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),

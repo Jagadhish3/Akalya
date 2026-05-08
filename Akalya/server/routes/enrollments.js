@@ -12,7 +12,16 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     let filter = {};
-    if (req.user.role === 'student') filter.studentId = req.user._id;
+    if (req.user.role === 'student') {
+      filter.studentId = req.user._id;
+    }
+
+    if (req.query.teacherId) {
+      // find courses belonging to this teacher
+      const teacherCourses = await Course.find({ teacherId: req.query.teacherId }).select('_id');
+      const courseIds = teacherCourses.map(c => c._id);
+      filter.courseId = { $in: courseIds };
+    }
 
     const enrollments = await CourseEnrollment.find(filter)
       .populate({

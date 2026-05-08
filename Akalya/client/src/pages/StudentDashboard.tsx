@@ -1,5 +1,5 @@
 // src/pages/StudentDashboard.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +38,6 @@ import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StudentWebsiteChatbot } from "@/components/StudentWebsiteChatbot";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CourseLecturesDialog } from "@/components/CourseLecturesDialog";
 
@@ -46,6 +45,7 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const idOf = (obj: any) => (typeof obj === 'object' ? (obj._id || obj.id || obj.courseId) : obj);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -181,13 +181,13 @@ export default function StudentDashboard() {
       s.assignment_id ??
       s.assignmentId ??
       (typeof s.assignment === "string" ? s.assignment : null) ??
-      (typeof s.assignment === "object" ? s.assignment._id ?? s.assignment.id : null);
+      (s.assignment && typeof s.assignment === "object" ? s.assignment._id ?? s.assignment.id : null);
 
     const studentId =
       s.student_id ??
       s.studentId ??
       (typeof s.student === "string" ? s.student : null) ??
-      (typeof s.student === "object" ? s.student._id ?? s.student.id : null);
+      (s.student && typeof s.student === "object" ? s.student._id ?? s.student.id : null);
 
     return {
       id: String(s._id ?? s.id ?? Math.random().toString(36).slice(2)),
@@ -201,6 +201,27 @@ export default function StudentDashboard() {
       submittedAt: s.submitted_at ?? s.submittedAt ?? s.createdAt ?? null,
     };
   };
+
+  const exploreCourses = useMemo(() => {
+    if (!Array.isArray(courses)) return [];
+    
+    // Group by title (subject)
+    const grouped: Record<string, any[]> = {};
+    courses.forEach(c => {
+      const status = (c?.status ?? "").toString().toLowerCase();
+      if (status === "draft") return;
+      const title = (c.title || "").trim();
+      if (!title) return;
+      if (!grouped[title]) grouped[title] = [];
+      grouped[title].push(c);
+    });
+
+    // Pick one random from each group (Random Allocation)
+    return Object.values(grouped).map(group => {
+      const randomIndex = Math.floor(Math.random() * group.length);
+      return group[randomIndex];
+    });
+  }, [courses]);
 
   // Fetch sequence: ensure enrollments are loaded before classes so filtering is correct
   useEffect(() => {
@@ -454,7 +475,7 @@ export default function StudentDashboard() {
 
         return {
           ...c,
-          _normalizedCourseId: typeof courseRef === "object" ? String(courseRef._id ?? courseRef.id ?? "") : String(courseRef ?? ""),
+          _normalizedCourseId: (courseRef && typeof courseRef === "object") ? String(courseRef._id ?? courseRef.id ?? "") : String(courseRef ?? ""),
           _normalizedStatus: status,
           _normalizedStart: startAt ? new Date(startAt) : null,
           _hasVideo: hasVideo,
@@ -548,7 +569,7 @@ export default function StudentDashboard() {
             (q.student && (q.student._id ?? q.student.id)) ??
             null;
           if (!qStudent) return false;
-          if (typeof qStudent === 'object') return String(qStudent._id ?? qStudent.id) === myId;
+          if (qStudent && typeof qStudent === 'object') return String(qStudent._id ?? qStudent.id) === myId;
           return String(qStudent) === myId;
         })
         .sort((a: any, b: any) => {
@@ -654,7 +675,7 @@ export default function StudentDashboard() {
         const match = courses.find((c: any) => String(c._id ?? c.id ?? "") === String(raw));
         if (!match) return null;
         return { id: String(match._id ?? match.id ?? ""), title: match.title };
-      } else if (typeof raw === "object") {
+      } else if (raw && typeof raw === "object") {
         return { id: String(raw._id ?? raw.id ?? raw.courseId ?? raw.course_id ?? ""), title: raw.title ?? raw.name };
       }
       return null;
@@ -829,7 +850,7 @@ export default function StudentDashboard() {
         >
           <DialogContent className="max-w-4xl w-full" aria-describedby="learning-dialog-desc">
             <DialogHeader>
-              <DialogTitle>{currentClass ? currentClass.title || "Course Video" : "Course Videos"}</DialogTitle>
+              <DialogTitle>{currentClass ? currentClass.title || t('ui.courseVideo') : t('ui.courseVideos')}</DialogTitle>
             </DialogHeader>
 
             <p id="learning-dialog-desc" className="sr-only">
@@ -842,7 +863,7 @@ export default function StudentDashboard() {
                 {currentClass ? (
                   <VideoPlayer classData={currentClass} />
                 ) : (
-                  <div className="p-6 text-center text-muted-foreground">Select a video to play</div>
+                  <div className="p-6 text-center text-muted-foreground">{t('ui.selectVideo')}</div>
                 )}
               </div>
 
@@ -867,7 +888,7 @@ export default function StudentDashboard() {
             </div>
 
             <div className="flex justify-end mt-4">
-              <Button variant="outline" onClick={() => setLearningOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setLearningOpen(false)}>{t('common.close')}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -875,8 +896,8 @@ export default function StudentDashboard() {
         <header className="bg-card border-b p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Student Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back, {user?.fullName}</p>
+              <h1 className="text-3xl font-bold">{t('student.dashboard')}</h1>
+              <p className="text-muted-foreground">{t('ui.welcomeBack')}, {user?.fullName}</p>
             </div>
             <div className="flex items-center gap-4">
               {/* Notifications removed from header as per user request */}
@@ -899,7 +920,7 @@ export default function StudentDashboard() {
             const pendingAssignmentsCount = Array.isArray(assignments)
               ? assignments.filter((assignment: any) => {
                 const assignmentCourseId = assignment.courseId ?? assignment.raw?.courseId ?? assignment.raw?.course ?? assignment.raw?.course_id ?? assignment.raw?.courses?._id ?? assignment.raw?.courses?.id ?? null;
-                const normalizedAssignmentCourseId = typeof assignmentCourseId === "object"
+                const normalizedAssignmentCourseId = (assignmentCourseId && typeof assignmentCourseId === "object")
                   ? String(assignmentCourseId._id ?? assignmentCourseId.id ?? "")
                   : String(assignmentCourseId ?? "");
                 if (!normalizedAssignmentCourseId) return false;
@@ -935,43 +956,43 @@ export default function StudentDashboard() {
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   <Card className="hover-scale">
                     <CardHeader className="pb-3">
-                      <CardDescription>Total Courses</CardDescription>
+                      <CardDescription>{t('student.totalCourses')}</CardDescription>
                       <CardTitle className="text-4xl">{totalCoursesCount}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
-                        +2 from last month
+                        +2 {t('ui.fromLastMonth')}
                       </p>
                     </CardContent>
                   </Card>
 
                   <Card className="hover-scale">
                     <CardHeader className="pb-3">
-                      <CardDescription>My Courses</CardDescription>
+                      <CardDescription>{t('courses.myCourses')}</CardDescription>
                       <CardTitle className="text-4xl">{myCoursesCount}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
-                        Enrolled courses
+                        {t('ui.enrolledCourses')}
                       </p>
                     </CardContent>
                   </Card>
 
                   <Card className="hover-scale">
                     <CardHeader className="pb-3">
-                      <CardDescription>Pending Assignments</CardDescription>
+                      <CardDescription>{t('student.pendingAssignments')}</CardDescription>
                       <CardTitle className="text-4xl">{pendingAssignmentsCount}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
-                        Due this week
+                        {t('ui.dueThisWeek')}
                       </p>
                     </CardContent>
                   </Card>
 
                   <Card className="hover-scale">
                     <CardHeader className="pb-3">
-                      <CardDescription>Attendance</CardDescription>
+                      <CardDescription>{t('student.attendance')}</CardDescription>
                       {/* Real attendance calculation */}
                       <CardTitle className="text-4xl">{attendanceStats?.percentage ?? 0}%</CardTitle>
                     </CardHeader>
@@ -1035,7 +1056,6 @@ export default function StudentDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-                <StudentWebsiteChatbot />
               </div>
             );
           })()}
@@ -1061,30 +1081,33 @@ export default function StudentDashboard() {
                 </Card>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {Array.isArray(courses) &&
-                    courses
-                      .filter((course) => (course?.status ?? "").toString().toLowerCase() !== "draft")
-                      .map((course, idx) => {
-                        const courseId = course._id || course.id;
-                        const normalizedCourse = {
-                          id: courseId,
-                          title: course.title,
-                          description: course.description,
-                          status: course.status,
-                          url: course.url || course.courseUrl || course.link || course.videoUrl || null,
-                        };
+                  {exploreCourses.map((course, idx) => {
+                    const courseId = course._id || course.id;
+                    const normalizedCourse = {
+                      id: courseId,
+                      title: course.title,
+                      description: course.description,
+                      status: course.status,
+                      teacherName: course.teacherId?.fullName || "Teacher",
+                      url: course.url || course.courseUrl || course.link || course.videoUrl || null,
+                    };
 
-                        const fallbackKey = String(normalizedCourse.id ?? normalizedCourse.title ?? `explore-${idx}`);
+                    const fallbackKey = String(normalizedCourse.id ?? normalizedCourse.title ?? `explore-${idx}`);
 
-                        return (
-                          <CourseCard
-                            key={fallbackKey}
-                            course={normalizedCourse}
-                            isEnrolled={isEnrolled(String(normalizedCourse.id))}
-                            onEnroll={() => handleEnroll(String(normalizedCourse.id))}
-                          />
-                        );
-                      })}
+                    return (
+                      <CourseCard
+                        key={fallbackKey}
+                        course={normalizedCourse}
+                        isEnrolled={isEnrolled(String(normalizedCourse.id))}
+                        onEnroll={() => handleEnroll(String(normalizedCourse.id))}
+                        onViewCourse={() => {
+                          if (normalizedCourse.url) {
+                            window.open(normalizedCourse.url, "_blank");
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1114,7 +1137,7 @@ export default function StudentDashboard() {
                       };
                       if ((normalized.status ?? "").toString().toLowerCase() === "draft") return null;
                       return normalized;
-                    } else if (typeof raw === "object") {
+                    } else if (raw && typeof raw === "object") {
                       const normalized = {
                         id: String(raw._id ?? raw.id ?? raw.courseId ?? raw.course_id ?? ""),
                         title: raw.title ?? raw.name,
@@ -1160,17 +1183,19 @@ export default function StudentDashboard() {
                             title: match.title,
                             description: match.description,
                             status: match.status,
+                            teacherName: match.teacherId?.fullName || "Teacher",
                             url: match.url ?? match.courseUrl ?? match.link ?? null,
                           };
                           if ((normalized.status ?? "").toString().toLowerCase() === "draft") return null;
                           if (!normalized.title) return null;
                           return normalized;
-                        } else if (typeof raw === "object") {
+                        } else if (raw && typeof raw === "object") {
                           const normalized = {
                             id: String(raw._id ?? raw.id ?? raw.courseId ?? raw.course_id ?? ""),
                             title: raw.title ?? raw.name,
                             description: raw.description,
                             status: raw.status,
+                            teacherName: raw.teacherId?.fullName || "Teacher",
                             url: raw.url ?? raw.courseUrl ?? raw.link ?? null,
                           };
                           if ((normalized.status ?? "").toString().toLowerCase() === "draft") return null;
@@ -1194,6 +1219,7 @@ export default function StudentDashboard() {
                         title: normalizedCourse.title,
                         description: normalizedCourse.description,
                         status: normalizedCourse.status,
+                        teacherName: normalizedCourse.teacherName,
                         url: normalizedCourse.url,
                       }}
                       isEnrolled={true}
@@ -1585,7 +1611,7 @@ export default function StudentDashboard() {
             const progressByCourse = (Array.isArray(enrolledCourses) ? enrolledCourses : [])
               .map((enr: any) => {
                 const raw = enr.course ?? enr.courseId ?? enr.course_id ?? enr;
-                const title = typeof raw === 'object' ? (raw.title ?? raw.name ?? '') : '';
+                const title = (raw && typeof raw === 'object') ? (raw.title ?? raw.name ?? '') : '';
                 const prog = typeof enr.progress === 'number' ? enr.progress : 0;
                 return { name: title, progress: prog };
               })

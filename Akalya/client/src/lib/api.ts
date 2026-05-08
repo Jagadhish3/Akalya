@@ -103,10 +103,10 @@ export const authAPI = {
     return data;
   },
 
-  signIn: async (email: string, password: string) => {
+  signIn: async (email: string, password: string, role?: string) => {
     const data = await apiFetch('/auth/signin', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, role }),
     });
     if (data?.token) {
       setToken(data.token);
@@ -166,8 +166,13 @@ export const authAPI = {
    Courses API
    ------------------------- */
 export const coursesAPI = {
-  getAll: async () => {
-    return apiFetch('/courses');
+  getAll: async (params?: { teacherId?: string; status?: string }) => {
+    const filtered: any = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => { if (v) filtered[k] = v; });
+    }
+    const qs = Object.keys(filtered).length > 0 ? "?" + new URLSearchParams(filtered).toString() : "";
+    return apiFetch(`/courses${qs}`);
   },
 
   getById: async (id: string) => {
@@ -207,8 +212,13 @@ export const coursesAPI = {
    Assignments API
    ------------------------- */
 export const assignmentsAPI = {
-  getAll: async () => {
-    return apiFetch('/assignments');
+  getAll: async (params?: { teacherId?: string; courseId?: string; status?: string }) => {
+    const filtered: any = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => { if (v) filtered[k] = v; });
+    }
+    const qs = Object.keys(filtered).length > 0 ? "?" + new URLSearchParams(filtered).toString() : "";
+    return apiFetch(`/assignments${qs}`);
   },
 
   getById: async (id: string) => {
@@ -275,8 +285,13 @@ create: async (courseId: string, title: string, description: string, dueDate: st
    Submissions API
    ------------------------- */
    export const submissionsAPI = {
-    getAll: async () => {
-      return apiFetch('/submissions');
+    getAll: async (params?: { teacherId?: string; assignmentId?: string; studentId?: string }) => {
+      const filtered: any = {};
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => { if (v) filtered[k] = v; });
+      }
+      const qs = Object.keys(filtered).length > 0 ? "?" + new URLSearchParams(filtered).toString() : "";
+      return apiFetch(`/submissions${qs}`);
     },
   
     getMine: async () => {
@@ -307,11 +322,12 @@ create: async (courseId: string, title: string, description: string, dueDate: st
    Classes API
    ------------------------- */
 export const classesAPI = {
-  getAll: async (filters?: { courseId?: string; status?: string; hasVideo?: boolean }) => {
+  getAll: async (filters?: { courseId?: string; status?: string; hasVideo?: boolean; teacherId?: string }) => {
     const params = new URLSearchParams();
     if (filters?.courseId) params.append('courseId', filters.courseId);
     if (filters?.status) params.append('status', filters.status);
     if (filters?.hasVideo) params.append('hasVideo', 'true');
+    if (filters?.teacherId) params.append('teacherId', filters.teacherId);
 
     const query = params.toString();
     return apiFetch(`/classes${query ? `?${query}` : ''}`);
@@ -354,8 +370,13 @@ export const classesAPI = {
    Enrollments API
    ------------------------- */
 export const enrollmentsAPI = {
-  getAll: async () => {
-    return apiFetch('/enrollments');
+  getAll: async (params?: { teacherId?: string; studentId?: string }) => {
+    const filtered: any = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => { if (v) filtered[k] = v; });
+    }
+    const qs = Object.keys(filtered).length > 0 ? "?" + new URLSearchParams(filtered).toString() : "";
+    return apiFetch(`/enrollments${qs}`);
   },
 
   create: async (courseId: string, studentId?: string) => {
@@ -470,12 +491,12 @@ export const chatAPI = {
 
   // src/lib/api.ts  (replace chatAssistant)
 // replace the existing chatAssistant function with this
-chatAssistant: async (messages: Array<{ role: string; content: string }>) => {
-  try {
-    const data: any = await apiFetch('/chat/assistant', {
-      method: 'POST',
-      body: JSON.stringify({ messages }),
-    });
+  chatAssistant: async (messages: Array<{ role: string; content: string }>, conversationId?: string) => {
+    try {
+      const data: any = await apiFetch('/chat/assistant', {
+        method: 'POST',
+        body: JSON.stringify({ messages, conversationId }),
+      });
 
     // If backend returned nothing, provide a default empty message
     if (!data) return { message: '', raw: data };
@@ -553,7 +574,11 @@ export const usersAPI = {
 
 export const queriesAPI = {
   getAll: async (params?: Record<string, any>) => {
-    const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+    const filtered: any = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => { if (v) filtered[k] = v; });
+    }
+    const qs = Object.keys(filtered).length > 0 ? "?" + new URLSearchParams(filtered).toString() : "";
     return apiFetch(`/queries${qs}`);
   },
   create: async (payload: { courseId?: string; courseTitle?: string; subject?: string; message: string }) => {
@@ -563,6 +588,7 @@ export const queriesAPI = {
     return apiFetch(`/queries/${id}`, { method: "PUT", body: JSON.stringify(updates) });
   },
 };
+
 
 /* -------------------------   Scholarships API   ------------------------- */
 export const scholarshipsAPI = {
@@ -694,6 +720,16 @@ export const lockerAPI = {
     a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  },
+  view: async (id: string) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE_URL}/locker/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("View failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   },
 };
 

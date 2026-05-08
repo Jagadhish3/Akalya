@@ -68,7 +68,7 @@ router.post('/signup', async (req, res) => {
 // Sign in
 router.post('/signin', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -78,6 +78,11 @@ router.post('/signin', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check role if provided
+    if (role && user.role !== role) {
+      return res.status(401).json({ error: `Invalid credentials for ${role} role` });
     }
 
     // Check password

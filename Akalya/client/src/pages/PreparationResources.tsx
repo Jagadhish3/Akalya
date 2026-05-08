@@ -32,9 +32,30 @@ export default function PreparationResources({ embedded }: { embedded?: boolean 
   useEffect(() => {
     let mounted = true;
     const params = typeFilter ? { type: typeFilter } : undefined;
+    
+    // Fetch from API
     preparationResourcesAPI.getAll(params).then((data) => {
-      if (mounted && Array.isArray(data)) setList(data);
+      if (mounted) {
+        if (Array.isArray(data) && data.length > 0) {
+          setList(data);
+        } else {
+          // Fallback to static data if API returns empty
+          const filteredStatic = typeFilter 
+            ? STATIC_PREPARATION_RESOURCES.filter(r => r.type === typeFilter)
+            : STATIC_PREPARATION_RESOURCES;
+          setList(filteredStatic);
+        }
+      }
+    }).catch(() => {
+      // Fallback to static data on error
+      if (mounted) {
+        const filteredStatic = typeFilter 
+          ? STATIC_PREPARATION_RESOURCES.filter(r => r.type === typeFilter)
+          : STATIC_PREPARATION_RESOURCES;
+        setList(filteredStatic);
+      }
     }).finally(() => { if (mounted) setLoading(false); });
+    
     return () => { mounted = false; };
   }, [typeFilter]);
 

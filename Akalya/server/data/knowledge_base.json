@@ -1,0 +1,44 @@
+{
+  "faqs": [
+    {
+      "keywords": ["scholarship", "financial aid", "money for studies"],
+      "answer": "You can find all available scholarships in the 'Career Gateway -> Scholarships' section. We list merit-based, need-based, and category-specific (SC/ST/OBC) scholarships from both government and private sources.",
+      "navigate": "/dashboard/student/career-gateway/scholarships"
+    },
+    {
+      "keywords": ["exam", "entrance exam", "competitive exam", "jee", "neet"],
+      "answer": "The 'Entrance Exams' section in the Career Gateway provides details on various national and state-level exams, including eligibility, syllabus, and important dates.",
+      "navigate": "/dashboard/student/career-gateway/entrance-exams"
+    },
+    {
+      "keywords": ["job", "internship", "work", "placement"],
+      "answer": "Check out the 'Jobs After 10th' and 'Jobs After 12th' sections in the Career Gateway. We also list skill-based internships and vocational training opportunities.",
+      "navigate": "/dashboard/student/career-gateway/jobs-after-12th"
+    },
+    {
+      "keywords": ["mock test", "test series", "practice test"],
+      "answer": "You can take timed mock tests in the 'Test Series' section or practice specific subjects in the 'Practice' section. Both offer instant grading and performance badges.",
+      "navigate": "/dashboard/student/career-gateway/test-series"
+    },
+    {
+      "keywords": ["locker", "documents", "certificates", "upload"],
+      "answer": "My Locker is a secure space where you can upload and store your academic certificates and identity documents for quick access during applications.",
+      "navigate": "/dashboard/student/career-gateway/locker"
+    },
+    {
+      "keywords": ["roadmap", "career path", "what to do"],
+      "answer": "The 'Career Roadmap' tool helps you plan your journey from school to your dream career by suggesting courses and exams based on your interests.",
+      "navigate": "/dashboard/student/career-gateway/career-roadmap"
+    },
+    {
+      "keywords": ["attendance", "present", "absent"],
+      "answer": "You can track your attendance for all enrolled courses in the 'Attendance' section on your dashboard. It shows your monthly and overall presence percentage.",
+      "navigate": "/dashboard/student"
+    },
+    {
+      "keywords": ["doubt", "clearance", "ask teacher", "question"],
+      "answer": "Use the 'Doubt Clearance' section to post questions to your teachers. You can also see responses from teachers and other students here.",
+      "navigate": "/dashboard/student"
+    }
+  ]
+}

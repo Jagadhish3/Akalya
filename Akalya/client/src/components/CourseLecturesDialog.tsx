@@ -6,16 +6,19 @@ import { PlayCircle, CheckCircle2 } from "lucide-react";
 import { classesAPI, enrollmentsAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CourseLecturesDialogProps {
   courseId: string | null;
   onClose: () => void;
   onProgressUpdated: () => void; // to refresh dashboard stats
+  isTeacherView?: boolean;
 }
 
-export function CourseLecturesDialog({ courseId, onClose, onProgressUpdated }: CourseLecturesDialogProps) {
+export function CourseLecturesDialog({ courseId, onClose, onProgressUpdated, isTeacherView = false }: CourseLecturesDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [courseClasses, setCourseClasses] = useState<any[]>([]);
   const [enrollment, setEnrollment] = useState<any>(null);
@@ -111,12 +114,12 @@ export function CourseLecturesDialog({ courseId, onClose, onProgressUpdated }: C
     <Dialog open={!!courseId} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Course Lectures</DialogTitle>
-          <DialogDescription>Watch video lectures and track your completion progress across 6 units.</DialogDescription>
+          <DialogTitle>{t('units.title')}</DialogTitle>
+          <DialogDescription>{t('units.description')}</DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="py-8 text-center text-muted-foreground">Loading lectures...</div>
+          <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>
         ) : (
           <div className="space-y-4 mt-4">
             {units.map((unitNum) => {
@@ -128,39 +131,43 @@ export function CourseLecturesDialog({ courseId, onClose, onProgressUpdated }: C
                 <div key={unitNum} className={`flex items-center justify-between p-4 border rounded-lg ${isCompleted ? "bg-primary/5 border-primary/20" : ""}`}>
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
-                      <span className="font-semibold text-sm">Unit {unitNum}</span>
+                      <span className="font-semibold text-sm">{t('units.unit')} {unitNum}</span>
                       {uploadedClass ? (
                         <span className="text-sm text-muted-foreground">{uploadedClass.title}</span>
                       ) : (
-                        <span className="text-sm text-muted-foreground italic">No video uploaded yet</span>
+                        <span className="text-sm text-muted-foreground italic">{t('units.noVideo')}</span>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
                     {uploadedClass ? (
-                      <>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="gap-2"
-                          onClick={() => handleWatchVideo(uploadedClass.videoUrl || uploadedClass.url || uploadedClass.src)}
-                        >
-                          <PlayCircle className="w-4 h-4" /> Watch
-                        </Button>
-                        <div className="flex items-center gap-2">
-                          <Checkbox 
-                            id={`unit-${unitNum}`} 
-                            checked={isCompleted} 
-                            onCheckedChange={(checked) => handleToggleComplete(unitNum, checked as boolean)}
-                          />
-                          <label htmlFor={`unit-${unitNum}`} className="text-sm font-medium leading-none cursor-pointer">
-                            Completed
-                          </label>
-                        </div>
-                      </>
+                      !isTeacherView ? (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-2"
+                            onClick={() => handleWatchVideo(uploadedClass.videoUrl || uploadedClass.url || uploadedClass.src)}
+                          >
+                            <PlayCircle className="w-4 h-4" /> {t('units.watch')}
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Checkbox 
+                              id={`unit-${unitNum}`} 
+                              checked={isCompleted} 
+                              onCheckedChange={(checked) => handleToggleComplete(unitNum, checked as boolean)}
+                            />
+                            <label htmlFor={`unit-${unitNum}`} className="text-sm font-medium leading-none cursor-pointer">
+                              {t('units.completed')}
+                            </label>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">{t('units.uploaded')}</span>
+                      )
                     ) : (
-                      <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded">Pending Upload</span>
+                      <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded">{t('units.pending')}</span>
                     )}
                   </div>
                 </div>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
+import { FloatingChatbot } from "./FloatingChatbot";
 
 const careerGatewayItems = [
   { to: "scholarships", label: "Scholarships", icon: Award },
@@ -175,6 +176,7 @@ export function StudentDashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <FloatingChatbot />
     </div>
   );
 }
