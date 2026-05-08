@@ -14,6 +14,7 @@ import {
   Library,
   Bell,
   Settings,
+  Megaphone,
 } from "lucide-react";
 import {
   coursesAPI,
@@ -637,10 +638,10 @@ export default function StudentDashboard() {
     { id: "explore", label: t("courses.explore"), icon: BookOpen },
     { id: "enrolled", label: t("courses.myCourses"), icon: GraduationCap },
     { id: "assignments", label: t("nav.assignments"), icon: FileText },
-    { id: "attendance", label: "Attendance", icon: Calendar },
+    { id: "attendance", label: t("student.attendanceTracking") || "Attendance", icon: Calendar },
     { id: "doubt", label: t("student.doubts") || "Doubts", icon: MessageSquare },
-    { id: "announcements", label: "Announcements", icon: Bell },
-    { id: "notifications", label: t("student.notifications") || "Notifications", icon: Bell },
+    { id: "announcements", label: t("nav.announcements") || "Announcements", icon: Megaphone },
+    { id: "progress", label: t("student.progress") || "Progress", icon: TrendingUp },
     { id: "library", label: t("nav.library"), icon: Library },
   ];
 
@@ -878,9 +879,7 @@ export default function StudentDashboard() {
               <p className="text-muted-foreground">Welcome back, {user?.fullName}</p>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon">
-                <Bell className="h-5 w-5" />
-              </Button>
+              {/* Notifications removed from header as per user request */}
             </div>
           </div>
         </header>

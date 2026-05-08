@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { coursesAPI } from "@/lib/api";
+import { coursesAPI, lockerAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Upload, Loader2, FileCheck } from "lucide-react";
 import { z } from "zod";
 
 const courseSchema = z.object({
@@ -31,6 +32,9 @@ export function EditCourseDialog({ course, open, onOpenChange, onCourseUpdated }
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [uploadingUrl, setUploadingUrl] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   const [status, setStatus] = useState<"draft" | "published">("published");
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -40,6 +44,7 @@ export function EditCourseDialog({ course, open, onOpenChange, onCourseUpdated }
       setTitle(course.title || "");
       setDescription(course.description || "");
       setUrl(course.url || course.courseUrl || "");
+      setThumbnailUrl(course.thumbnailUrl || "");
       setStatus(course.status === "draft" ? "draft" : "published");
     }
   }, [course]);
@@ -72,7 +77,8 @@ export function EditCourseDialog({ course, open, onOpenChange, onCourseUpdated }
           title: validation.data.title,
           description: validation.data.description || null,
           status,
-          url: validation.data.url || null
+          url: validation.data.url || null,
+          thumbnailUrl: thumbnailUrl?.trim() ? thumbnailUrl.trim() : null
         }
       );
 
@@ -91,6 +97,25 @@ export function EditCourseDialog({ course, open, onOpenChange, onCourseUpdated }
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, target: 'url' | 'thumbnail') => {
+    const setter = target === 'url' ? setUrl : setThumbnailUrl;
+    const loader = target === 'url' ? setUploadingUrl : setUploadingThumb;
+    
+    loader(true);
+    try {
+      const res = await lockerAPI.upload(file);
+      const fileUrl = res.url || res.fileUrl;
+      if (fileUrl) {
+        setter(fileUrl);
+        toast({ title: "Success", description: `${target} uploaded successfully` });
+      }
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+    } finally {
+      loader(false);
     }
   };
 
@@ -130,15 +155,67 @@ export function EditCourseDialog({ course, open, onOpenChange, onCourseUpdated }
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="url">Course Link (optional)</Label>
-            <Input
-              id="url"
-              placeholder="https://example.com/course-info"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={loading}
-              maxLength={2000}
-            />
+            <Label htmlFor="url">Course Link or Content File (optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="url"
+                placeholder="https://example.com/course-info"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={loading || uploadingUrl}
+                className="flex-1"
+              />
+              <div className="relative">
+                <input
+                  type="file"
+                  id="file-content-edit"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'url')}
+                  disabled={uploadingUrl}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => document.getElementById('file-content-edit')?.click()}
+                  disabled={uploadingUrl}
+                >
+                  {uploadingUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="thumbnailUrl">Course Preview Image (Link or Upload)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="thumbnailUrl"
+                placeholder="https://example.com/preview-image.jpg"
+                value={thumbnailUrl}
+                onChange={(e) => setThumbnailUrl(e.target.value)}
+                disabled={loading || uploadingThumb}
+                className="flex-1"
+              />
+              <div className="relative">
+                <input
+                  type="file"
+                  id="file-thumb-edit"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'thumbnail')}
+                  disabled={uploadingThumb}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => document.getElementById('file-thumb-edit')?.click()}
+                  disabled={uploadingThumb}
+                >
+                  {uploadingThumb ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

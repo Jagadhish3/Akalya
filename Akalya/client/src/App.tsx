@@ -27,6 +27,7 @@ import TestSeries from "./pages/TestSeries";
 import TestSeriesAttempt from "./pages/TestSeriesAttempt";
 import Locker from "./pages/Locker";
 import Certifications from "./pages/Certifications";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
 
               {/* Student dashboard: layout + nested routes. Career Gateway and all sub-modules require student auth. */}
               <Route

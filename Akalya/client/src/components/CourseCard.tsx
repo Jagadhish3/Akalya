@@ -121,18 +121,20 @@ export const CourseCard: React.FC<Props> = ({
       {/* Actions */}
       <div className="px-4 pb-4">
         <div className="flex items-center justify-between gap-3">
-          <a
-            href={course.url ?? "#"}
+          <Button
+            variant="outline"
+            size="sm"
             onClick={(e) => { 
               if (!course.url) {
                 e.preventDefault();
                 if (onViewCourse) onViewCourse(id);
+              } else {
+                window.open(course.url, "_blank");
               }
             }}
-            className="text-sm text-primary underline cursor-pointer"
           >
             View course
-          </a>
+          </Button>
 
           <div className="flex items-center gap-2">
             {isEnrolled ? (

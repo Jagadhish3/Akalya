@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { coursesAPI, assignmentsAPI, submissionsAPI, classesAPI, enrollmentsAPI, queriesAPI, attendanceAPI, usersAPI, announcementsAPI, resourcesAPI } from "@/lib/api";
 import { CreateCourseDialog } from "@/components/CreateCourseDialog";
 import { EditCourseDialog } from "@/components/EditCourseDialog";
+import { UploadResourceDialog } from "@/components/UploadResourceDialog";
 import { CourseCard } from "@/components/CourseCard";
 import { CreateAssignmentDialog } from "@/components/CreateAssignmentDialog";
 import { GradeSubmissionDialog } from "@/components/GradeSubmissionDialog";
@@ -140,13 +141,14 @@ export default function TeacherDashboard() {
   const fetchDashboardRealtime = async () => {
     if (!user) return;
     try {
-      const [coursesRes, assignmentsRes, submissionsRes, classesRes, enrollmentsRes, queriesRes] = await Promise.allSettled([
+      const [coursesRes, assignmentsRes, submissionsRes, classesRes, enrollmentsRes, queriesRes, notifRes] = await Promise.allSettled([
         coursesAPI.getAll(),
         assignmentsAPI.getAll(),
         submissionsAPI.getAll(),
         classesAPI.getAll({ hasVideo: true }),
         enrollmentsAPI.getAll(),
         queriesAPI.getAll(),
+        notificationsAPI.getMine(),
       ]);
 
       if (coursesRes.status === "fulfilled") setCourses(Array.isArray(coursesRes.value) ? coursesRes.value : []);
@@ -158,6 +160,9 @@ export default function TeacherDashboard() {
         const q = queriesRes.value;
         const list = Array.isArray(q) ? q : (q?.items ?? []);
         setQueries(list);
+      }
+      if (notifRes.status === "fulfilled") {
+        setNotifications(Array.isArray(notifRes.value) ? notifRes.value : []);
       }
       
     } catch (err: any) {
@@ -1049,7 +1054,9 @@ export default function TeacherDashboard() {
                 </div>
                 <div className="flex gap-2">
                   {courses.length > 0 && <CreateClassDialog courses={courses} courseId={String(courses[0].id ?? courses[0]._id ?? courses[0].courseId ?? "")} onClassCreated={fetchClasses} />}
-                  <Button><Upload className="h-4 w-4 mr-2" />Upload Resource</Button>
+                  <div className="flex items-center gap-2">
+                  <UploadResourceDialog onResourceUploaded={fetchLibraryResources} />
+                </div>
                 </div>
               </div>
 

@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
-import { coursesAPI } from "@/lib/api";
+import { coursesAPI, lockerAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Plus, Upload, Loader2, FileCheck } from "lucide-react";
 import { z } from "zod";
 
 const courseSchema = z.object({
@@ -31,6 +31,9 @@ export function CreateCourseDialog({ onCourseCreated }: CreateCourseDialogProps)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState(""); // NEW
+  const [thumbnailUrl, setThumbnailUrl] = useState(""); // NEW: Course Preview Image
+  const [uploadingUrl, setUploadingUrl] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
   // Default to published so students see the course immediately in "Explore Courses"
   const [status, setStatus] = useState<"draft" | "published">("published");
   const { toast } = useToast();
@@ -58,12 +61,13 @@ export function CreateCourseDialog({ onCourseCreated }: CreateCourseDialogProps)
     setLoading(true);
 
     try {
-      // Pass url as fourth argument (may be undefined or null)
+      // Pass url and thumbnailUrl as arguments
       await coursesAPI.create(
         validation.data.title,
         validation.data.description || null,
         status,
-        validation.data.url || null
+        validation.data.url || null,
+        thumbnailUrl?.trim() ? thumbnailUrl.trim() : null
       );
 
       toast({
@@ -74,6 +78,7 @@ export function CreateCourseDialog({ onCourseCreated }: CreateCourseDialogProps)
       setTitle("");
       setDescription("");
       setUrl(""); // reset
+      setThumbnailUrl(""); // reset
       setStatus("published");
       setOpen(false);
       onCourseCreated();
@@ -85,6 +90,25 @@ export function CreateCourseDialog({ onCourseCreated }: CreateCourseDialogProps)
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, target: 'url' | 'thumbnail') => {
+    const setter = target === 'url' ? setUrl : setThumbnailUrl;
+    const loader = target === 'url' ? setUploadingUrl : setUploadingThumb;
+    
+    loader(true);
+    try {
+      const res = await lockerAPI.upload(file);
+      const fileUrl = res.url || res.fileUrl;
+      if (fileUrl) {
+        setter(fileUrl);
+        toast({ title: "Success", description: `${target} uploaded successfully` });
+      }
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+    } finally {
+      loader(false);
     }
   };
 
@@ -131,15 +155,68 @@ export function CreateCourseDialog({ onCourseCreated }: CreateCourseDialogProps)
 
           {/* NEW: Course URL */}
           <div className="space-y-2">
-            <Label htmlFor="url">Course Link (optional)</Label>
-            <Input
-              id="url"
-              placeholder="https://example.com/course-info"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={loading}
-              maxLength={2000}
-            />
+            <Label htmlFor="url">Course Link or Content File (optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="url"
+                placeholder="https://example.com/course-info"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={loading || uploadingUrl}
+                className="flex-1"
+              />
+              <div className="relative">
+                <input
+                  type="file"
+                  id="file-content"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'url')}
+                  disabled={uploadingUrl}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => document.getElementById('file-content')?.click()}
+                  disabled={uploadingUrl}
+                >
+                  {uploadingUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* NEW: Thumbnail URL */}
+          <div className="space-y-2">
+            <Label htmlFor="thumbnailUrl">Course Preview Image (Link or Upload)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="thumbnailUrl"
+                placeholder="https://example.com/preview-image.jpg"
+                value={thumbnailUrl}
+                onChange={(e) => setThumbnailUrl(e.target.value)}
+                disabled={loading || uploadingThumb}
+                className="flex-1"
+              />
+              <div className="relative">
+                <input
+                  type="file"
+                  id="file-thumb"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'thumbnail')}
+                  disabled={uploadingThumb}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => document.getElementById('file-thumb')?.click()}
+                  disabled={uploadingThumb}
+                >
+                  {uploadingThumb ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

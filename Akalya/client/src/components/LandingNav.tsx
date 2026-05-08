@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Moon, Sun, Menu, X } from "lucide-react";
+import { GraduationCap, Moon, Sun, Menu, X, Home, Info, Mail } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useState } from "react";
 
 const links = [
-  { to: "/", label: "Home" },
-  { to: "/about", label: "About" },
-  { to: "/contact", label: "Contact" },
+  { to: "/", label: "Home", icon: Home },
+  { to: "/about", label: "About", icon: Info },
+  { to: "/contact", label: "Contact", icon: Mail },
 ];
 
 export function LandingNav() {
@@ -26,10 +26,15 @@ export function LandingNav() {
           </Link>
 
           <div className="hidden md:flex items-center gap-1">
-            {links.map(({ to, label }) => (
+            {links.map(({ to, label, icon: Icon }) => (
               <Link key={to} to={to}>
-                <Button variant="ghost" size="sm">
-                  {label}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="relative group gap-2 px-3 py-1.5 hover:bg-primary/10 rounded-full transition-all duration-300"
+                >
+                  <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <span className="relative z-10 font-medium group-hover:text-primary transition-colors">{label}</span>
                 </Button>
               </Link>
             ))}
@@ -60,11 +65,12 @@ export function LandingNav() {
           </div>
         </div>
         {mobileOpen && (
-          <div className="md:hidden border-t border-border py-2 px-4 space-y-1">
-            {links.map(({ to, label }) => (
+          <div className="md:hidden border-t border-border py-2 px-4 space-y-1 animate-in slide-in-from-top duration-300">
+            {links.map(({ to, label, icon: Icon }) => (
               <Link key={to} to={to} onClick={() => setMobileOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start">
-                  {label}
+                <Button variant="ghost" className="w-full justify-start gap-3 rounded-xl hover:bg-primary/10 group">
+                  <Icon className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                  <span className="font-medium group-hover:text-primary transition-colors">{label}</span>
                 </Button>
               </Link>
             ))}

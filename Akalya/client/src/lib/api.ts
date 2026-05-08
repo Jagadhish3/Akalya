@@ -148,6 +148,18 @@ export const authAPI = {
       body: JSON.stringify({ role }),
     });
   },
+  forgotPassword: async (email: string) => {
+    return apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+  resetPassword: async (token: string, password: string) => {
+    return apiFetch(`/auth/reset-password/${token}`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
 };
 
 /* -------------------------
@@ -162,20 +174,21 @@ export const coursesAPI = {
     return apiFetch(`/courses/${id}`);
   },
 
-  // create now accepts optional url
+  // create now accepts optional url and thumbnailUrl
   create: async (
     title: string,
     description: string,
     status: 'draft' | 'published',
-    url?: string | null
+    url?: string | null,
+    thumbnailUrl?: string | null
   ) => {
     return apiFetch('/courses', {
       method: 'POST',
-      body: JSON.stringify({ title, description, status, url }),
+      body: JSON.stringify({ title, description, status, url, thumbnailUrl }),
     });
   },
 
-  update: async (id: string, data: { title?: string; description?: string; status?: string; url?: string | null }) => {
+  update: async (id: string, data: { title?: string; description?: string; status?: string; url?: string | null; thumbnailUrl?: string | null }) => {
     return apiFetch(`/courses/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
